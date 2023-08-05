@@ -18,10 +18,7 @@ logger = logging.getLogger(__name__)
 
 def align(v, alignment):
     remainder = v % alignment
-    if remainder == 0:
-        return v
-    else:
-        return v + (alignment - remainder)
+    return v if remainder == 0 else v + (alignment - remainder)
 
 
 def read_cstr(buf, offset) -> str:
@@ -146,13 +143,25 @@ class ELF:
             raise CorruptElfFile(f"not an ELF file: invalid ei_data: 0x{ei_data:02x}")
 
         if self.bitness == 32:
-            e_phoff, e_shoff = struct.unpack_from(self.endian + "II", self.file_header, 0x1C)
-            self.e_phentsize, self.e_phnum = struct.unpack_from(self.endian + "HH", self.file_header, 0x2A)
-            self.e_shentsize, self.e_shnum = struct.unpack_from(self.endian + "HH", self.file_header, 0x2E)
+            e_phoff, e_shoff = struct.unpack_from(
+                f"{self.endian}II", self.file_header, 0x1C
+            )
+            self.e_phentsize, self.e_phnum = struct.unpack_from(
+                f"{self.endian}HH", self.file_header, 0x2A
+            )
+            self.e_shentsize, self.e_shnum = struct.unpack_from(
+                f"{self.endian}HH", self.file_header, 0x2E
+            )
         elif self.bitness == 64:
-            e_phoff, e_shoff = struct.unpack_from(self.endian + "QQ", self.file_header, 0x20)
-            self.e_phentsize, self.e_phnum = struct.unpack_from(self.endian + "HH", self.file_header, 0x36)
-            self.e_shentsize, self.e_shnum = struct.unpack_from(self.endian + "HH", self.file_header, 0x3A)
+            e_phoff, e_shoff = struct.unpack_from(
+                f"{self.endian}QQ", self.file_header, 0x20
+            )
+            self.e_phentsize, self.e_phnum = struct.unpack_from(
+                f"{self.endian}HH", self.file_header, 0x36
+            )
+            self.e_shentsize, self.e_shnum = struct.unpack_from(
+                f"{self.endian}HH", self.file_header, 0x3A
+            )
         else:
             raise NotImplementedError()
 
@@ -202,7 +211,7 @@ class ELF:
 
     @property
     def ei_osabi(self) -> Optional[OS]:
-        (ei_osabi,) = struct.unpack_from(self.endian + "B", self.file_header, 7)
+        (ei_osabi,) = struct.unpack_from(f"{self.endian}B", self.file_header, 7)
         return ELF.OSABI.get(ei_osabi)
 
     MACHINE = {
@@ -296,20 +305,24 @@ class ELF:
 
     @property
     def e_machine(self) -> Optional[str]:
-        (e_machine,) = struct.unpack_from(self.endian + "H", self.file_header, 0x12)
+        (e_machine,) = struct.unpack_from(f"{self.endian}H", self.file_header, 0x12)
         return ELF.MACHINE.get(e_machine)
 
     def parse_program_header(self, i) -> Phdr:
         phent_offset = i * self.e_phentsize
         phent = self.phbuf[phent_offset : phent_offset + self.e_phentsize]
 
-        (p_type,) = struct.unpack_from(self.endian + "I", phent, 0x0)
+        (p_type,) = struct.unpack_from(f"{self.endian}I", phent, 0x0)
         logger.debug("ph:p_type: 0x%04x", p_type)
 
         if self.bitness == 32:
-            p_offset, p_vaddr, p_paddr, p_filesz = struct.unpack_from(self.endian + "IIII", phent, 0x4)
+            p_offset, p_vaddr, p_paddr, p_filesz = struct.unpack_from(
+                f"{self.endian}IIII", phent, 0x4
+            )
         elif self.bitness == 64:
-            p_offset, p_vaddr, p_paddr, p_filesz = struct.unpack_from(self.endian + "QQQQ", phent, 0x8)
+            p_offset, p_vaddr, p_paddr, p_filesz = struct.unpack_from(
+                f"{self.endian}QQQQ", phent, 0x8
+            )
         else:
             raise NotImplementedError()
 
@@ -335,13 +348,31 @@ class ELF:
         shent = self.shbuf[shent_offset : shent_offset + self.e_shentsize]
 
         if self.bitness == 32:
-            sh_name, sh_type, sh_flags, sh_addr, sh_offset, sh_size, sh_link, _, _, sh_entsize = struct.unpack_from(
-                self.endian + "IIIIIIIIII", shent, 0x0
-            )
+            (
+                sh_name,
+                sh_type,
+                sh_flags,
+                sh_addr,
+                sh_offset,
+                sh_size,
+                sh_link,
+                _,
+                _,
+                sh_entsize,
+            ) = struct.unpack_from(f"{self.endian}IIIIIIIIII", shent, 0x0)
         elif self.bitness == 64:
-            sh_name, sh_type, sh_flags, sh_addr, sh_offset, sh_size, sh_link, _, _, sh_entsize = struct.unpack_from(
-                self.endian + "IIQQQQIIQQ", shent, 0x0
-            )
+            (
+                sh_name,
+                sh_type,
+                sh_flags,
+                sh_addr,
+                sh_offset,
+                sh_size,
+                sh_link,
+                _,
+                _,
+                sh_entsize,
+            ) = struct.unpack_from(f"{self.endian}IIQQQQIIQQ", shent, 0x0)
         else:
             raise NotImplementedError()
 
@@ -398,7 +429,7 @@ class ELF:
             while True:
                 # ElfXX_Verneed layout is the same on 32 and 64 bit
                 vn_version, vn_cnt, vn_file, vn_aux, vn_next = struct.unpack_from(
-                    self.endian + "HHIII", shdr.buf, vn_offset
+                    f"{self.endian}HHIII", shdr.buf, vn_offset
                 )
                 if vn_version != 1:
                     # unexpected format, don't try to keep parsing
@@ -413,7 +444,9 @@ class ELF:
                 vna_offset = vn_offset + vn_aux
                 for _ in range(vn_cnt):
                     # ElfXX_Vernaux layout is the same on 32 and 64 bit
-                    _, _, _, vna_name, vna_next = struct.unpack_from(self.endian + "IHHII", shdr.buf, vna_offset)
+                    _, _, _, vna_name, vna_next = struct.unpack_from(
+                        f"{self.endian}IHHII", shdr.buf, vna_offset
+                    )
 
                     # ABI names, like: "GLIBC_2.2.5"
                     abi = read_cstr(linked_shdr.buf, vna_name)
@@ -444,10 +477,10 @@ class ELF:
             offset = 0x0
             while True:
                 if self.bitness == 32:
-                    d_tag, d_val = struct.unpack_from(self.endian + "II", phdr.buf, offset)
+                    d_tag, d_val = struct.unpack_from(f"{self.endian}II", phdr.buf, offset)
                     offset += 8
                 elif self.bitness == 64:
-                    d_tag, d_val = struct.unpack_from(self.endian + "QQ", phdr.buf, offset)
+                    d_tag, d_val = struct.unpack_from(f"{self.endian}QQ", phdr.buf, offset)
                     offset += 16
                 else:
                     raise NotImplementedError()
@@ -466,42 +499,35 @@ class ELF:
         DT_STRTAB = 0x5
         DT_STRSZ = 0xA
 
-        strtab_addr = None
-        strtab_size = None
-
-        for d_tag, d_val in self.dynamic_entries:
-            if d_tag == DT_STRTAB:
-                strtab_addr = d_val
-                break
-
-        for d_tag, d_val in self.dynamic_entries:
-            if d_tag == DT_STRSZ:
-                strtab_size = d_val
-                break
-
+        strtab_addr = next(
+            (d_val for d_tag, d_val in self.dynamic_entries if d_tag == DT_STRTAB),
+            None,
+        )
+        strtab_size = next(
+            (d_val for d_tag, d_val in self.dynamic_entries if d_tag == DT_STRSZ),
+            None,
+        )
         if strtab_addr is None:
             return None
 
         if strtab_size is None:
             return None
 
-        strtab_offset = None
-        for shdr in self.section_headers:
-            # the section header address should be defined
-            if shdr.addr and shdr.addr <= strtab_addr < shdr.addr + shdr.size:
-                strtab_offset = shdr.offset + (strtab_addr - shdr.addr)
-                break
-
+        strtab_offset = next(
+            (
+                shdr.offset + (strtab_addr - shdr.addr)
+                for shdr in self.section_headers
+                if shdr.addr and shdr.addr <= strtab_addr < shdr.addr + shdr.size
+            ),
+            None,
+        )
         if strtab_offset is None:
             return None
 
         self.f.seek(strtab_offset)
         strtab_buf = self.f.read(strtab_size)
 
-        if len(strtab_buf) != strtab_size:
-            return None
-
-        return strtab_buf
+        return None if len(strtab_buf) != strtab_size else strtab_buf
 
     @property
     def needed(self) -> Iterator[str]:
@@ -563,7 +589,9 @@ class PHNote:
         self._parse()
 
     def _parse(self):
-        namesz, self.descsz, self.type_ = struct.unpack_from(self.endian + "III", self.buf, 0x0)
+        namesz, self.descsz, self.type_ = struct.unpack_from(
+            f"{self.endian}III", self.buf, 0x0
+        )
         name_offset = 0xC
         self.desc_offset = name_offset + align(namesz, 0x4)
 
@@ -587,7 +615,9 @@ class PHNote:
             return None
 
         desc = self.buf[self.desc_offset : self.desc_offset + self.descsz]
-        abi_tag, kmajor, kminor, kpatch = struct.unpack_from(self.endian + "IIII", desc, 0x0)
+        abi_tag, kmajor, kminor, kpatch = struct.unpack_from(
+            f"{self.endian}IIII", desc, 0x0
+        )
         logger.debug("GNU_ABI_TAG: 0x%02x", abi_tag)
 
         os = GNU_ABI_TAG.get(abi_tag)
@@ -612,7 +642,9 @@ class SHNote:
         self._parse()
 
     def _parse(self):
-        namesz, self.descsz, self.type_ = struct.unpack_from(self.endian + "III", self.buf, 0x0)
+        namesz, self.descsz, self.type_ = struct.unpack_from(
+            f"{self.endian}III", self.buf, 0x0
+        )
         name_offset = 0xC
         self.desc_offset = name_offset + align(namesz, 0x4)
 
@@ -631,7 +663,9 @@ class SHNote:
             return None
 
         desc = self.buf[self.desc_offset : self.desc_offset + self.descsz]
-        abi_tag, kmajor, kminor, kpatch = struct.unpack_from(self.endian + "IIII", desc, 0x0)
+        abi_tag, kmajor, kminor, kpatch = struct.unpack_from(
+            f"{self.endian}IIII", desc, 0x0
+        )
         logger.debug("GNU_ABI_TAG: 0x%02x", abi_tag)
 
         os = GNU_ABI_TAG.get(abi_tag)
@@ -678,11 +712,11 @@ class SymTab:
         for i in range(int(len(self.symtab.buf) / self.symtab.entsize)):
             if bitness == 32:
                 name_offset, value, size, info, other, shndx = struct.unpack_from(
-                    endian + "IIIBBH", symtab_buf, i * self.symtab.entsize
+                    f"{endian}IIIBBH", symtab_buf, i * self.symtab.entsize
                 )
             elif bitness == 64:
                 name_offset, info, other, shndx, value, size = struct.unpack_from(
-                    endian + "IBBHQQ", symtab_buf, i * self.symtab.entsize
+                    f"{endian}IBBHQQ", symtab_buf, i * self.symtab.entsize
                 )
 
             self.symbols.append(Symbol(name_offset, value, size, info, other, shndx))
@@ -765,13 +799,8 @@ def guess_os_from_ph_notes(elf: ELF) -> Optional[OS]:
             logger.debug("note owner: %s", "FREEBSD")
             return OS.FREEBSD
         elif note.name == "GNU":
-            abi_tag = note.abi_tag
-            if abi_tag:
+            if abi_tag := note.abi_tag:
                 return abi_tag.os
-            else:
-                # cannot make a guess about the OS, but probably linux or hurd
-                pass
-
     return None
 
 
@@ -798,13 +827,8 @@ def guess_os_from_sh_notes(elf: ELF) -> Optional[OS]:
             logger.debug("note owner: %s", "FREEBSD")
             return OS.FREEBSD
         elif note.name == "GNU":
-            abi_tag = note.abi_tag
-            if abi_tag:
+            if abi_tag := note.abi_tag:
                 return abi_tag.os
-            else:
-                # cannot make a guess about the OS, but probably linux or hurd
-                pass
-
     return None
 
 
@@ -812,10 +836,7 @@ def guess_os_from_linker(elf: ELF) -> Optional[OS]:
     # search for recognizable dynamic linkers (interpreters)
     # for example, on linux, we see file paths like: /lib64/ld-linux-x86-64.so.2
     linker = elf.linker
-    if linker and "ld-linux" in elf.linker:
-        return OS.LINUX
-
-    return None
+    return OS.LINUX if linker and "ld-linux" in elf.linker else None
 
 
 def guess_os_from_abi_versions_needed(elf: ELF) -> Optional[OS]:
@@ -824,27 +845,18 @@ def guess_os_from_abi_versions_needed(elf: ELF) -> Optional[OS]:
 
     versions_needed = elf.versions_needed
     if any(abi.startswith("GLIBC") for abi in itertools.chain(*versions_needed.values())):
-        # there are any GLIBC versions needed
-
         if elf.e_machine != "i386":
             # GLIBC runs on Linux and Hurd.
             # for Hurd, its *only* on i386.
             # so if we're not on i386, then we're on Linux.
             return OS.LINUX
 
-        else:
-            # we're on i386, so we could be on either Linux or Hurd.
-            linker = elf.linker
-
-            if linker and "ld-linux" in linker:
+        if linker := elf.linker:
+            if "ld-linux" in linker:
                 return OS.LINUX
 
-            elif linker and "/ld.so" in linker:
+            elif "/ld.so" in linker:
                 return OS.HURD
-
-            else:
-                # we don't have any good guesses based on versions needed
-                pass
 
     return None
 

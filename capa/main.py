@@ -233,9 +233,8 @@ def find_file_capabilities(ruleset: RuleSet, extractor: FeatureExtractor, functi
         # the set of addresses will still be empty.
         if va:
             file_features[feature].add(va)
-        else:
-            if feature not in file_features:
-                file_features[feature] = set()
+        elif feature not in file_features:
+            file_features[feature] = set()
 
     logger.debug("analyzed file and extracted %d features", len(file_features))
 
@@ -420,10 +419,11 @@ def get_meta_str(vw):
     """
     Return workspace meta information string
     """
-    meta = []
-    for k in ["Format", "Platform", "Architecture"]:
-        if k in vw.metadata:
-            meta.append(f"{k.lower()}: {vw.metadata[k]}")
+    meta = [
+        f"{k.lower()}: {vw.metadata[k]}"
+        for k in ["Format", "Platform", "Architecture"]
+        if k in vw.metadata
+    ]
     return f"{', '.join(meta)}, number of functions: {len(vw.getFunctions())}"
 
 
@@ -441,14 +441,13 @@ def get_default_root() -> Path:
     under PyInstaller, this comes from _MEIPASS.
     under source, this is the root directory of the project.
     """
-    if is_running_standalone():
-        # pylance/mypy don't like `sys._MEIPASS` because this isn't standard.
-        # its injected by pyinstaller.
-        # so we'll fetch this attribute dynamically.
-        assert hasattr(sys, "_MEIPASS")
-        return Path(sys._MEIPASS)
-    else:
+    if not is_running_standalone():
         return Path(__file__).resolve().parent.parent
+    # pylance/mypy don't like `sys._MEIPASS` because this isn't standard.
+    # its injected by pyinstaller.
+    # so we'll fetch this attribute dynamically.
+    assert hasattr(sys, "_MEIPASS")
+    return Path(sys._MEIPASS)
 
 
 def get_default_signatures() -> List[Path]:
@@ -458,12 +457,12 @@ def get_default_signatures() -> List[Path]:
     sigs_path = get_default_root() / "sigs"
     logger.debug("signatures path: %s", sigs_path)
 
-    ret = []
-    for file in sigs_path.rglob("*"):
-        if file.is_file() and file.suffix.lower() in (".pat", ".pat.gz", ".sig"):
-            ret.append(file)
-
-    return ret
+    return [
+        file
+        for file in sigs_path.rglob("*")
+        if file.is_file()
+        and file.suffix.lower() in (".pat", ".pat.gz", ".sig")
+    ]
 
 
 def get_workspace(path: Path, format_: str, sigpaths: List[Path]):
@@ -501,7 +500,7 @@ def get_workspace(path: Path, format_: str, sigpaths: List[Path]):
     elif format_ == FORMAT_SC64:
         vw = viv_utils.getShellcodeWorkspaceFromFile(str(path), arch="amd64", analyze=False)
     else:
-        raise ValueError("unexpected format: " + format_)
+        raise ValueError(f"unexpected format: {format_}")
 
     viv_utils.flirt.register_flirt_signature_analyzers(vw, [str(s) for s in sigpaths])
 
@@ -592,7 +591,7 @@ def get_extractor(
         return capa.features.extractors.viv.extractor.VivisectFeatureExtractor(vw, path, os_)
 
     else:
-        raise ValueError("unexpected backend: " + backend)
+        raise ValueError(f"unexpected backend: {backend}")
 
 
 def get_file_extractors(sample: Path, format_: str) -> List[FeatureExtractor]:
@@ -602,9 +601,14 @@ def get_file_extractors(sample: Path, format_: str) -> List[FeatureExtractor]:
         file_extractors.append(capa.features.extractors.pefile.PefileFeatureExtractor(sample))
 
     elif format_ == FORMAT_DOTNET:
-        file_extractors.append(capa.features.extractors.pefile.PefileFeatureExtractor(sample))
-        file_extractors.append(capa.features.extractors.dnfile_.DnfileFeatureExtractor(sample))
-
+        file_extractors.extend(
+            (
+                capa.features.extractors.pefile.PefileFeatureExtractor(sample),
+                capa.features.extractors.dnfile_.DnfileFeatureExtractor(
+                    sample
+                ),
+            )
+        )
     elif format_ == capa.features.extractors.common.FORMAT_ELF:
         file_extractors.append(capa.features.extractors.elffile.ElfFeatureExtractor(sample))
 
@@ -722,10 +726,12 @@ def get_signatures(sigs_path: Path) -> List[Path]:
         paths.append(sigs_path)
     elif sigs_path.is_dir():
         logger.debug("reading signatures from directory %s", sigs_path.resolve())
-        for file in sigs_path.rglob("*"):
-            if file.is_file() and file.suffix.lower() in (".pat", ".pat.gz", ".sig"):
-                paths.append(file)
-
+        paths.extend(
+            file
+            for file in sigs_path.rglob("*")
+            if file.is_file()
+            and file.suffix.lower() in (".pat", ".pat.gz", ".sig")
+        )
     # Convert paths to their absolute and normalized forms
     paths = [path.resolve().absolute() for path in paths]
 
@@ -817,12 +823,14 @@ def compute_layout(rules, extractor, capabilities) -> rdoc.Layout:
                 assert addr in functions_by_bb
                 matched_bbs.add(addr)
 
-    layout = rdoc.Layout(
+    return rdoc.Layout(
         functions=tuple(
             rdoc.FunctionLayout(
                 address=frz.Address.from_capa(f),
                 matched_basic_blocks=tuple(
-                    rdoc.BasicBlockLayout(address=frz.Address.from_capa(bb)) for bb in bbs if bb in matched_bbs
+                    rdoc.BasicBlockLayout(address=frz.Address.from_capa(bb))
+                    for bb in bbs
+                    if bb in matched_bbs
                 )  # this object is open to extension in the future,
                 # such as with the function name, etc.
             )
@@ -830,8 +838,6 @@ def compute_layout(rules, extractor, capabilities) -> rdoc.Layout:
             if len([bb for bb in bbs if bb in matched_bbs]) > 0
         )
     )
-
-    return layout
 
 
 def install_common_args(parser, wanted=None):
@@ -1014,7 +1020,7 @@ def handle_common_args(args):
     elif args.color == "never":
         colorama.init(strip=True)
     else:
-        raise RuntimeError("unexpected --color value: " + args.color)
+        raise RuntimeError(f"unexpected --color value: {args.color}")
 
     if hasattr(args, "sample"):
         args.sample = Path(args.sample)
@@ -1044,10 +1050,11 @@ def handle_common_args(args):
             rules_paths.append(default_rule_path)
             args.is_default_rules = True
         else:
-            for rule in args.rules:
-                if RULES_PATH_DEFAULT_STRING != rule:
-                    rules_paths.append(Path(rule))
-
+            rules_paths.extend(
+                Path(rule)
+                for rule in args.rules
+                if RULES_PATH_DEFAULT_STRING != rule
+            )
             for rule_path in rules_paths:
                 logger.debug("using rules path: %s", rule_path)
 

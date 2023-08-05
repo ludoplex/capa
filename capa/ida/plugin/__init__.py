@@ -69,13 +69,11 @@ class CapaExplorerPlugin(idaapi.plugin_t):
         """
         if not self.form:
             self.form = CapaExplorerForm(self.PLUGIN_NAME, arg)
+        elif widget := idaapi.find_widget(self.form.form_title):
+            idaapi.activate_widget(widget, True)
         else:
-            widget = idaapi.find_widget(self.form.form_title)
-            if widget:
-                idaapi.activate_widget(widget, True)
-            else:
-                self.form.Show()
-                self.form.load_capa_results(False, True)
+            self.form.Show()
+            self.form.load_capa_results(False, True)
 
         return True
 
@@ -118,7 +116,7 @@ class OnUpdatedActionsHook(ida_kernwin.UI_Hooks):
 
 def install_icon():
     plugin_name = CapaExplorerPlugin.PLUGIN_NAME
-    action_name = "Edit/Plugins/" + plugin_name
+    action_name = f"Edit/Plugins/{plugin_name}"
 
     if action_name not in ida_kernwin.get_registered_actions():
         # keep the hook registered

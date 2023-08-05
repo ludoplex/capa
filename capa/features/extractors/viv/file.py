@@ -134,8 +134,7 @@ def extract_features(vw, buf: bytes) -> Iterator[Tuple[Feature, Address]]:
     """
 
     for file_handler in FILE_HANDLERS:
-        for feature, addr in file_handler(vw=vw, buf=buf):  # type: ignore
-            yield feature, addr
+        yield from file_handler(vw=vw, buf=buf)
 
 
 FILE_HANDLERS = (

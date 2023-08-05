@@ -333,7 +333,7 @@ def is_nzxor_stack_cookie(f: Function, bb: BinjaBasicBlock, llil: LowLevelILInst
         reg_names.append(llil.right.src.name)
 
     # stack cookie reg should be stack/frame pointer
-    if not any(reg in ["ebp", "esp", "rbp", "rsp", "sp"] for reg in reg_names):
+    if all(reg not in ["ebp", "esp", "rbp", "rsp", "sp"] for reg in reg_names):
         return False
 
     # expect security cookie init in first basic block within first bytes (instructions)
@@ -341,10 +341,9 @@ def is_nzxor_stack_cookie(f: Function, bb: BinjaBasicBlock, llil: LowLevelILInst
         return True
 
     # ... or within last bytes (instructions) before a return
-    if len(bb.outgoing_edges) == 0 and llil.address > (bb.end - SECURITY_COOKIE_BYTES_DELTA):
-        return True
-
-    return False
+    return len(bb.outgoing_edges) == 0 and llil.address > (
+        bb.end - SECURITY_COOKIE_BYTES_DELTA
+    )
 
 
 def extract_insn_nzxor_characteristic_features(
@@ -561,8 +560,7 @@ def extract_function_indirect_call_characteristic_features(
 def extract_features(f: FunctionHandle, bbh: BBHandle, insn: InsnHandle) -> Iterator[Tuple[Feature, Address]]:
     """extract instruction features"""
     for inst_handler in INSTRUCTION_HANDLERS:
-        for feature, ea in inst_handler(f, bbh, insn):
-            yield feature, ea
+        yield from inst_handler(f, bbh, insn)
 
 
 INSTRUCTION_HANDLERS = (

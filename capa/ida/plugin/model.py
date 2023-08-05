@@ -205,14 +205,8 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
         if not self.hasIndex(row, column, parent):
             return QtCore.QModelIndex()
 
-        if not parent.isValid():
-            parent_item = self.root_node
-        else:
-            parent_item = parent.internalPointer()
-
-        child_item = parent_item.child(row)
-
-        if child_item:
+        parent_item = parent.internalPointer() if parent.isValid() else self.root_node
+        if child_item := parent_item.child(row):
             return self.createIndex(row, column, child_item)
         else:
             return QtCore.QModelIndex()
@@ -282,14 +276,13 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
             # item checked - record current highlight and set to new
             item.ida_highlight = curr_highlight
             idc.set_color(item.location, idc.CIC_ITEM, DEFAULT_HIGHLIGHT)
+        elif curr_highlight == DEFAULT_HIGHLIGHT:
+            # reset highlight to previous
+            idc.set_color(item.location, idc.CIC_ITEM, item.ida_highlight)
+
         else:
-            # item unchecked - reset highlight
-            if curr_highlight != DEFAULT_HIGHLIGHT:
-                # user modified highlight - record new highlight and do not modify
-                item.ida_highlight = curr_highlight
-            else:
-                # reset highlight to previous
-                idc.set_color(item.location, idc.CIC_ITEM, item.ida_highlight)
+            # user modified highlight - record new highlight and do not modify
+            item.ida_highlight = curr_highlight
 
     def setData(self, model_index, value, role):
         """set data at index by role
@@ -371,10 +364,6 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
                 if statement.description:
                     display += f" ({statement.description})"
                 return CapaExplorerDefaultItem(parent, display)
-        elif isinstance(statement, rd.CompoundStatement) and statement.type == rd.CompoundStatementType.NOT:
-            # TODO(mike-hunhoff): verify that we can display NOT statements
-            # https://github.com/mandiant/capa/issues/1602
-            pass
         elif isinstance(statement, rd.SomeStatement):
             display = f"{statement.count} or more"
             if statement.description:
@@ -412,7 +401,7 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
                 display += f" ({statement.description})"
             return CapaExplorerSubscopeItem(parent, display)
         else:
-            raise RuntimeError("unexpected match statement type: " + str(statement))
+            raise RuntimeError(f"unexpected match statement type: {str(statement)}")
 
     def render_capa_doc_match(self, parent: CapaExplorerDataItem, match: rd.Match, doc: rd.ResultDocument):
         """render capa match read from doc
@@ -426,7 +415,6 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
             # https://github.com/mandiant/capa/issues/1601
             return
 
-        # optional statement with no successful children is empty
         if isinstance(match.node, rd.StatementNode) and match.node.statement.type == rd.CompoundStatementType.OPTIONAL:
             if not any(m.success for m in match.children):
                 return
@@ -440,7 +428,7 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
                 parent, match, match.node.feature, [addr.to_capa() for addr in match.locations], doc
             )
         else:
-            raise RuntimeError("unexpected node type: " + str(match.node.type))
+            raise RuntimeError(f"unexpected node type: {str(match.node.type)}")
 
         for child in match.children:
             self.render_capa_doc_match(parent2, child, doc)
@@ -509,7 +497,7 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
                 elif rule.meta.scope == capa.rules.INSTRUCTION_SCOPE:
                     parent2 = CapaExplorerInstructionItem(parent, location)
                 else:
-                    raise RuntimeError("unexpected rule scope: " + str(rule.meta.scope))
+                    raise RuntimeError(f"unexpected rule scope: {str(rule.meta.scope)}")
 
                 self.render_capa_doc_match(parent2, match, doc)
 
@@ -535,25 +523,23 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
         @param feature: capa feature read from doc
         """
         key = feature.type
-        value = feature.dict(by_alias=True).get(feature.type)
-
-        if value:
-            if isinstance(feature, frzf.StringFeature):
-                value = f'"{capa.features.common.escape_string(value)}"'
-
-            if isinstance(feature, frzf.PropertyFeature) and feature.access is not None:
-                key = f"property/{feature.access}"
-            elif isinstance(feature, frzf.OperandNumberFeature):
-                key = f"operand[{feature.index}].number"
-            elif isinstance(feature, frzf.OperandOffsetFeature):
-                key = f"operand[{feature.index}].offset"
-
-            if feature.description:
-                return f"{key}({value} = {feature.description})"
-            else:
-                return f"{key}({value})"
-        else:
+        if not (value := feature.dict(by_alias=True).get(feature.type)):
             return f"{key}"
+        if isinstance(feature, frzf.StringFeature):
+            value = f'"{capa.features.common.escape_string(value)}"'
+
+        if isinstance(feature, frzf.PropertyFeature) and feature.access is not None:
+            key = f"property/{feature.access}"
+        elif isinstance(feature, frzf.OperandNumberFeature):
+            key = f"operand[{feature.index}].number"
+        elif isinstance(feature, frzf.OperandOffsetFeature):
+            key = f"operand[{feature.index}].offset"
+
+        return (
+            f"{key}({value} = {feature.description})"
+            if feature.description
+            else f"{key}({value})"
+        )
 
     def render_capa_doc_feature_node(
         self,
@@ -624,14 +610,9 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
             return CapaExplorerInstructionViewItem(parent, display, location)
 
         elif isinstance(feature, frzf.MatchFeature):
-            # display content of rule for all rule matches
-            matched_rule_source = ""
-
             # check if match is a matched rule
             matched_rule = doc.rules.get(feature.match)
-            if matched_rule is not None:
-                matched_rule_source = matched_rule.source
-
+            matched_rule_source = matched_rule.source if matched_rule is not None else ""
             return CapaExplorerRuleMatchItem(parent, display, source=matched_rule_source)
 
         elif isinstance(feature, (frzf.RegexFeature, frzf.SubstringFeature)):
@@ -640,7 +621,10 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
                     assert isinstance(addr, frz.Address)
                     if location == addr.value:
                         return CapaExplorerStringViewItem(
-                            parent, display, location, '"' + capa.features.common.escape_string(capture) + '"'
+                            parent,
+                            display,
+                            location,
+                            f'"{capa.features.common.escape_string(capture)}"',
                         )
 
             # programming error: the given location should always be found in the regex matches
@@ -695,7 +679,7 @@ class CapaExplorerDataModel(QtCore.QAbstractItemModel):
         ):
             return CapaExplorerFeatureItem(parent, display=display)
 
-        raise RuntimeError("unexpected feature type: " + str(feature.type))
+        raise RuntimeError(f"unexpected feature type: {str(feature.type)}")
 
     def update_function_name(self, old_name, new_name):
         """update all instances of old function name with new function name

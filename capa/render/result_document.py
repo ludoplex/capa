@@ -316,8 +316,10 @@ class Match(FrozenModel):
                         )
                     )
 
-                for location in result.locations:
-                    children.append(Match.from_capa(rules, capabilities, rule_matches[location]))
+                children.extend(
+                    Match.from_capa(rules, capabilities, rule_matches[location])
+                    for location in result.locations
+                )
             else:
                 # this is a namespace that we're matching
                 #
@@ -348,19 +350,13 @@ class Match(FrozenModel):
                         # this would be a breaking change and require updates to the renderers.
                         # in the meantime, the above might be sufficient.
                         rule_matches = dict(capabilities[rule.name])
-                        for location in result.locations:
-                            # doc[locations] contains all matches for the given namespace.
-                            # for example, the feature might be `match: anti-analysis/packer`
-                            # which matches against "generic unpacker" and "UPX".
-                            # in this case, doc[locations] contains locations for *both* of thse.
-                            #
-                            # rule_matches contains the matches for the specific rule.
-                            # this is a subset of doc[locations].
-                            #
-                            # so, grab only the locations for current rule.
-                            if location in rule_matches:
-                                children.append(Match.from_capa(rules, capabilities, rule_matches[location]))
-
+                        children.extend(
+                            Match.from_capa(
+                                rules, capabilities, rule_matches[location]
+                            )
+                            for location in result.locations
+                            if location in rule_matches
+                        )
         return cls(
             success=success,
             node=node,
@@ -406,7 +402,7 @@ class Match(FrozenModel):
 def parse_parts_id(s: str):
     id_ = ""
     parts = s.split("::")
-    if len(parts) > 0:
+    if parts:
         last = parts.pop()
         last, _, id_ = last.rpartition(" ")
         id_ = id_.lstrip("[").rstrip("]")
@@ -434,17 +430,10 @@ class AttackSpec(FrozenModel):
 
     @classmethod
     def from_str(cls, s) -> "AttackSpec":
-        tactic = ""
-        technique = ""
-        subtechnique = ""
         parts, id_ = parse_parts_id(s)
-        if len(parts) > 0:
-            tactic = parts[0]
-        if len(parts) > 1:
-            technique = parts[1]
-        if len(parts) > 2:
-            subtechnique = parts[2]
-
+        tactic = parts[0] if len(parts) > 0 else ""
+        technique = parts[1] if len(parts) > 1 else ""
+        subtechnique = parts[2] if len(parts) > 2 else ""
         return cls(
             parts=parts,
             tactic=tactic,
@@ -474,17 +463,10 @@ class MBCSpec(FrozenModel):
 
     @classmethod
     def from_str(cls, s) -> "MBCSpec":
-        objective = ""
-        behavior = ""
-        method = ""
         parts, id_ = parse_parts_id(s)
-        if len(parts) > 0:
-            objective = parts[0]
-        if len(parts) > 1:
-            behavior = parts[1]
-        if len(parts) > 2:
-            method = parts[2]
-
+        objective = parts[0] if len(parts) > 0 else ""
+        behavior = parts[1] if len(parts) > 1 else ""
+        method = parts[2] if len(parts) > 2 else ""
         return cls(
             parts=parts,
             objective=objective,

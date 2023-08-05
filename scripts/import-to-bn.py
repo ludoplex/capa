@@ -56,8 +56,8 @@ def load_analysis(bv):
     shortname = Path(bv.file.filename).resolve().stem
     dirname = Path(bv.file.filename).resolve().parent
     binaryninja.log_info(f"dirname: {dirname}\nshortname: {shortname}\n")
-    js_path = path = dirname / (shortname + ".js")
-    json_path = dirname / (shortname + ".json")
+    js_path = path = dirname / f"{shortname}.js"
+    json_path = dirname / f"{shortname}.json"
     if os.access(str(js_path), os.R_OK):
         path = js_path
     elif os.access(str(json_path), os.R_OK):
@@ -101,17 +101,13 @@ def load_analysis(bv):
     # order by (namespace, name) so that like things show up together
     rows = sorted(rows)
     for ns, name, va in rows:
-        if ns:
-            cmt = f"{name} ({ns})"
-        else:
-            cmt = f"{name}"
-
+        cmt = f"{name} ({ns})" if ns else f"{name}"
         binaryninja.log_info(f"{hex(va)}: {cmt}")
         try:
             # message will look something like:
             #
             #     capa: delete service (host-interaction/service/delete)
-            append_func_cmt(bv, va, "capa: " + cmt)
+            append_func_cmt(bv, va, f"capa: {cmt}")
         except ValueError:
             continue
 

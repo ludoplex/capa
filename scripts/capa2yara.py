@@ -111,7 +111,7 @@ def check_feature(statement, rulename):
 def get_rule_url(path):
     path = re.sub(r"\.\.\/", "", path)
     path = re.sub(r"capa-rules\/", "", path)
-    return "https://github.com/mandiant/capa-rules/blob/master/" + path
+    return f"https://github.com/mandiant/capa-rules/blob/master/{path}"
 
 
 def convert_capa_number_to_yara_bytes(number):
@@ -130,26 +130,22 @@ def convert_capa_number_to_yara_bytes(number):
     bytesl.reverse()
     bytesv = " ".join(bytesl)
 
-    # fix spaces
-    bytesv = bytesv[1:] + " "
-
-    return bytesv
+    return f"{bytesv[1:]} "
 
 
 def convert_rule_name(rule_name):
     # yara rule names: "Identifiers must follow the same lexical conventions of the C programming language, they can contain any alphanumeric character and the underscore character
     # but the first character cannot be a digit. Rule identifiers are case sensitive and cannot exceed 128 characters." so we replace any non-alphanum with _
     rule_name = re.sub(r"\W", "_", rule_name)
-    rule_name = "capa_" + rule_name
+    rule_name = f"capa_{rule_name}"
 
     return rule_name
 
 
 def convert_description(statement):
     try:
-        desc = statement.description
-        if desc:
-            yara_desc = " // " + desc
+        if desc := statement.description:
+            yara_desc = f" // {desc}"
             logger.info("using desc: %r", yara_desc)
             return yara_desc
     except Exception:
@@ -176,10 +172,10 @@ def convert_rule(rule, rulename, cround, depth):
             string = string.replace("\\", "\\\\")
             string = string.replace("\n", "\\n")
             string = string.replace("\t", "\\t")
-            var_name = "str_" + var_names.pop(0)
+            var_name = f"str_{var_names.pop(0)}"
             yara_strings += "\t$" + var_name + ' = "' + string + '" ascii wide' + convert_description(kid) + "\n"
             yara_condition += "\t$" + var_name + " "
-        elif s_type == "api" or s_type == "import":
+        elif s_type in ["api", "import"]:
             # research needed to decide if its possible in YARA to make a difference between api & import?
 
             # https://github.com/mandiant/capa-rules/blob/master/doc/format.md#api
@@ -193,7 +189,7 @@ def convert_rule(rule, rulename, cround, depth):
             if "::" in api:
                 mod, api = api.split("::")
 
-                var_name = "api_" + var_names.pop(0)
+                var_name = f"api_{var_names.pop(0)}"
                 yara_strings += "\t$" + var_name + " = /\\b" + api + "(A|W)?\\b/ ascii wide\n"
                 yara_condition += "\t$" + var_name + " "
 
@@ -211,7 +207,7 @@ def convert_rule(rule, rulename, cround, depth):
                 # yara_condition += '\tpe.imports(/.{0,30}/i, /' + api + '/) '
                 # 5fbbfeed28b258c42e0cfeb16718b31c, 2D3EDC218A90F03089CC01715A9F047F, 7EFF498DE13CC734262F87E6B3EF38AB,
                 # C91887D861D9BD4A5872249B641BC9F9, a70052c45e907820187c7e6bcdc7ecca, 0596C4EA5AA8DEF47F22C85D75AACA95
-                var_name = "api_" + var_names.pop(0)
+                var_name = f"api_{var_names.pop(0)}"
 
                 # limit regex with word boundary \b but also search for appended A and W
                 # alternatively: use something like /(\\x00|\\x01|\\x02|\\x03|\\x04)' + api + '(A|W)?\\x00/  ???
@@ -245,7 +241,7 @@ def convert_rule(rule, rulename, cround, depth):
             #      - match: host-interaction/file-system/write
             match_rule_name = convert_rule_name(match)
 
-            if match.startswith(rulename + "/"):
+            if match.startswith(f"{rulename}/"):
                 logger.info("Depending on myself = basic block: %s", match)
                 return "BREAK", "Depending on myself = basic block"
 
@@ -283,9 +279,9 @@ def convert_rule(rule, rulename, cround, depth):
             number = convert_capa_number_to_yara_bytes(number)
             logger.info("number ok: %r", number)
 
-            var_name = "num_" + var_names.pop(0)
+            var_name = f"num_{var_names.pop(0)}"
             yara_strings += "\t$" + var_name + " = { " + number + "}" + convert_description(kid) + "\n"
-            yara_condition += "$" + var_name + " "
+            yara_condition += f"${var_name} "
 
         elif s_type == "regex":
             regex = kid.get_value_str()
@@ -314,15 +310,15 @@ def convert_rule(rule, rulename, cround, depth):
 
             # regex = re.sub(r"^\^", r"\\b", regex)
 
-            regex = "/" + regex + "/"
+            regex = f"/{regex}/"
             if count:
                 regex += " nocase"
 
             # strange: if statement.name == "string", the string is as it is, if statement.name == "regex", the string has // around it, e.g. /regex/
-            var_name = "re_" + var_names.pop(0)
+            var_name = f"re_{var_names.pop(0)}"
             yara_strings += "\t" + "$" + var_name + " = " + regex + " ascii wide " + convert_description(kid) + "\n"
             yara_condition += "\t" + "$" + var_name + " "
-        elif s_type == "Not" or s_type == "And" or s_type == "Or":
+        elif s_type in ["Not", "And", "Or"]:
             pass
         else:
             logger.info("something unhandled: %r", s_type)
@@ -344,7 +340,7 @@ def convert_rule(rule, rulename, cround, depth):
     if check_feature(statement, rulename):
         return "BREAK", statement, rule_comment, incomplete
 
-    if statement == "And" or statement == "Or":
+    if statement in ["And", "Or"]:
         desc = convert_description(rule)
         if desc:
             logger.info("description of bool statement: %r", desc)
@@ -483,17 +479,13 @@ def convert_rule(rule, rulename, cround, depth):
     if not yara_condition_list:
         return (
             "BREAK",
-            'Multiple statements inside "- or:" where all unsupported, the last one was "' + s_type + '"',
+            f'Multiple statements inside "- or:" where all unsupported, the last one was "{s_type}"',
             rule_comment,
             incomplete,
         )
 
-    if statement == "And" or statement == "Or":
-        if yara_strings_list:
-            yara_strings = "".join(yara_strings_list)
-        else:
-            yara_strings = ""
-
+    if statement in ["And", "Or"]:
+        yara_strings = "".join(yara_strings_list) if yara_strings_list else ""
         yara_condition = " (\n\t\t" + ("\n\t\t" + statement.lower() + " ").join(yara_condition_list) + " \n\t) "
 
     elif statement == "Some":
@@ -583,7 +575,7 @@ def convert_rules(rules, namespaces, cround, make_priv):
 
             for dep in dependencies:
                 logger.info("Dependencies at44: %s", dep)
-                if not dep.startswith(rule.name + "/"):
+                if not dep.startswith(f"{rule.name}/"):
                     logger.info("Depending on another rule: %s", dep)
                     continue
 
@@ -601,8 +593,6 @@ def convert_rules(rules, namespaces, cround, make_priv):
 
             for meta in metas:
                 meta_name = meta
-                # e.g. 'examples:' can be a list
-                seen_hashes = []
                 if isinstance(metas[meta], list):
                     if meta_name == "examples":
                         meta_name = "hash"
@@ -610,29 +600,27 @@ def convert_rules(rules, namespaces, cround, make_priv):
                         meta_name = "attack"
                         for attack in list(metas[meta]):
                             logger.info("attack: %s", attack)
-                            # cut out tag in square brackets, e.g. Defense Evasion::Obfuscated Files or Information [T1027] => T1027
-                            r = re.search(r"\[(T[^\]]*)", attack)
-                            if r:
-                                tag = r.group(1)
+                            if r := re.search(r"\[(T[^\]]*)", attack):
+                                tag = r[1]
                                 logger.info("attack tag: %s", tag)
                                 tag = re.sub(r"\W", "_", tag)
-                                rule_tags += tag + " "
+                                rule_tags += f"{tag} "
                                 # also add a line "attack = ..." to yaras 'meta:' to keep the long description:
                                 yara_meta += '\tattack = "' + attack + '"\n'
                     elif meta_name == "mbc":
                         for mbc in list(metas[meta]):
                             logger.info("mbc: %s", mbc)
-                            # cut out tag in square brackets, e.g. Cryptography::Encrypt Data::RC6 [C0027.010] => C0027.010
-                            r = re.search(r"\[(.[^\]]*)", mbc)
-                            if r:
-                                tag = r.group(1)
+                            if r := re.search(r"\[(.[^\]]*)", mbc):
+                                tag = r[1]
                                 logger.info("mbc tag: %s", tag)
                                 tag = re.sub(r"\W", "_", tag)
-                                rule_tags += tag + " "
+                                rule_tags += f"{tag} "
 
                                 # also add a line "mbc = ..." to yaras 'meta:' to keep the long description:
                                 yara_meta += '\tmbc = "' + mbc + '"\n'
 
+                    # e.g. 'examples:' can be a list
+                    seen_hashes = []
                     for value in metas[meta]:
                         if meta_name == "hash":
                             value = re.sub(r"^([0-9a-f]{20,64}):0x[0-9a-f]{1,10}$", r"\1", value, flags=re.IGNORECASE)
@@ -648,7 +636,7 @@ def convert_rules(rules, namespaces, cround, make_priv):
                     if meta == "capa/path":
                         url = get_rule_url(metas[meta])
                         meta_name = "reference"
-                        meta_value = "This YARA rule converted from capa rule: " + url
+                        meta_value = f"This YARA rule converted from capa rule: {url}"
                     else:
                         meta_value = metas[meta]
 
@@ -682,20 +670,23 @@ def convert_rules(rules, namespaces, cround, make_priv):
 
                 # put yara rule tags here:
                 rule_tags = default_tags + rule_tags
-                yara += "rule " + rule_name + " : " + rule_tags + " { \n  meta: \n " + yara_meta + "\n"
+                yara += (
+                    f"rule {rule_name} : {rule_tags}"
+                    + " { \n  meta: \n "
+                    + yara_meta
+                    + "\n"
+                )
 
                 if "$" in yara_strings:
                     yara += "  strings: \n " + yara_strings + " \n"
 
-                yara += "  condition:" + condition_header + yara_condition + "\n}"
+                yara += f"  condition:{condition_header}{yara_condition}" + "\n}"
 
                 output_yar(yara)
                 converted_rules.append(rule_name)
                 count_incomplete += incomplete
             else:
                 output_unsupported_capa_rules(rule.to_yaml(), rule.name, url, yara_condition)
-                pass
-
     return count_incomplete
 
 

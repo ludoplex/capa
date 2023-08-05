@@ -106,8 +106,7 @@ def extract_file_os(elf: ELFFile, buf, **kwargs):
     # our current approach does not always get an OS value, e.g. for packed samples
     # for file limitation purposes, we're more lax here
     try:
-        os_tuple = next(capa.features.extractors.common.extract_os(buf))
-        yield os_tuple
+        yield next(capa.features.extractors.common.extract_os(buf))
     except StopIteration:
         yield OS("unknown"), NO_ADDRESS
 
@@ -128,8 +127,7 @@ def extract_file_arch(elf: ELFFile, **kwargs):
 
 def extract_file_features(elf: ELFFile, buf: bytes) -> Iterator[Tuple[Feature, int]]:
     for file_handler in FILE_HANDLERS:
-        for feature, addr in file_handler(elf=elf, buf=buf):  # type: ignore
-            yield feature, addr
+        yield from file_handler(elf=elf, buf=buf)
 
 
 FILE_HANDLERS = (
@@ -144,8 +142,7 @@ FILE_HANDLERS = (
 
 def extract_global_features(elf: ELFFile, buf: bytes) -> Iterator[Tuple[Feature, int]]:
     for global_handler in GLOBAL_HANDLERS:
-        for feature, addr in global_handler(elf=elf, buf=buf):  # type: ignore
-            yield feature, addr
+        yield from global_handler(elf=elf, buf=buf)
 
 
 GLOBAL_HANDLERS = (
@@ -169,14 +166,12 @@ class ElfFeatureExtractor(FeatureExtractor):
     def extract_global_features(self):
         buf = self.path.read_bytes()
 
-        for feature, addr in extract_global_features(self.elf, buf):
-            yield feature, addr
+        yield from extract_global_features(self.elf, buf)
 
     def extract_file_features(self):
         buf = self.path.read_bytes()
 
-        for feature, addr in extract_file_features(self.elf, buf):
-            yield feature, addr
+        yield from extract_file_features(self.elf, buf)
 
     def get_functions(self):
         raise NotImplementedError("ElfFeatureExtractor can only be used to extract file features")

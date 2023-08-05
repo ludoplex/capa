@@ -56,8 +56,8 @@ def get_callee(
         # we must check unmanaged imports before managed methods because we map forwarded managed methods
         # to their unmanaged imports; we prefer a forwarded managed method be mapped to its unmanaged import for analysis
         callee = cache.get_native_import(token_)
-        if callee is None:
-            callee = cache.get_method(token_)
+    if callee is None:
+        callee = cache.get_method(token_)
     return callee
 
 

@@ -120,16 +120,12 @@ def render_matches_by_function(doc: rd.ResultDocument):
             for addr, _ in rule.matches:
                 function = functions_by_bb[addr]
                 matches_by_function[function].add(rule.meta.name)
-        else:
-            # file scope
-            pass
-
     for f in doc.meta.analysis.feature_counts.functions:
         if not matches_by_function.get(f.address, {}):
             continue
         ostream.writeln(f"function at {capa.render.verbose.format_address(addr)} with {f.count} features: ")
         for rule_name in sorted(matches_by_function[f.address]):
-            ostream.writeln("  - " + rule_name)
+            ostream.writeln(f"  - {rule_name}")
 
     return ostream.getvalue()
 

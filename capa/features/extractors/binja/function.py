@@ -40,9 +40,7 @@ def extract_function_loop(fh: FunctionHandle):
 
     # construct control flow graph
     for bb in func.basic_blocks:
-        for edge in bb.outgoing_edges:
-            edges.append((bb.start, edge.target.start))
-
+        edges.extend((bb.start, edge.target.start) for edge in bb.outgoing_edges)
     if loops.has_loop(edges):
         yield Characteristic("loop"), fh.address
 
@@ -61,8 +59,7 @@ def extract_recursive_call(fh: FunctionHandle):
 
 def extract_features(fh: FunctionHandle) -> Iterator[Tuple[Feature, Address]]:
     for func_handler in FUNCTION_HANDLERS:
-        for feature, addr in func_handler(fh):
-            yield feature, addr
+        yield from func_handler(fh)
 
 
 FUNCTION_HANDLERS = (extract_function_calls_to, extract_function_loop, extract_recursive_call)

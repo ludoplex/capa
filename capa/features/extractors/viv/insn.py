@@ -57,12 +57,11 @@ def get_imports(vw):
     """
     if "imports" in vw.metadata:
         return vw.metadata["imports"]
-    else:
-        imports = {
-            p[0]: (p[3].rpartition(".")[0], p[3].replace(".ord", ".#").rpartition(".")[2]) for p in vw.getImports()
-        }
-        vw.metadata["imports"] = imports
-        return imports
+    imports = {
+        p[0]: (p[3].rpartition(".")[0], p[3].replace(".ord", ".#").rpartition(".")[2]) for p in vw.getImports()
+    }
+    vw.metadata["imports"] = imports
+    return imports
 
 
 def extract_insn_api_features(fh: FunctionHandle, bb, ih: InsnHandle) -> Iterator[Tuple[Feature, Address]]:
@@ -92,18 +91,6 @@ def extract_insn_api_features(fh: FunctionHandle, bb, ih: InsnHandle) -> Iterato
             for name in capa.features.extractors.helpers.generate_symbols(dll, symbol):
                 yield API(name), ih.address
 
-    # call via thunk on x86,
-    # see 9324d1a8ae37a36ae560c37448c9705a at 0x407985
-    #
-    # this is also how calls to internal functions may be decoded on x32 and x64.
-    # see Lab21-01.exe_:0x140001178
-    #
-    # follow chained thunks, e.g. in 82bf6347acf15e5d883715dc289d8a2b at 0x14005E0FF in
-    # 0x140059342 (viv) / 0x14005E0C0 (IDA)
-    # 14005E0FF call    j_ElfClearEventLogFileW (14005AAF8)
-    #   14005AAF8 jmp     ElfClearEventLogFileW (14005E196)
-    #     14005E196 jmp     cs:__imp_ElfClearEventLogFileW
-
     elif isinstance(insn.opers[0], envi.archs.i386.disasm.i386PcRelOper):
         imports = get_imports(f.vw)
         target = capa.features.extractors.viv.helpers.get_coderef_from(f.vw, insn.va)
@@ -119,14 +106,13 @@ def extract_insn_api_features(fh: FunctionHandle, bb, ih: InsnHandle) -> Iterato
                 except Exception:
                     fh.ctx["cache"]["symtab"] = None
 
-            symtab = fh.ctx["cache"]["symtab"]
-            if symtab:
+            if symtab := fh.ctx["cache"]["symtab"]:
+                STT_FUNC = 0x2
                 for symbol in symtab.get_symbols():
                     sym_name = symtab.get_name(symbol)
                     sym_value = symbol.value
                     sym_info = symbol.info
 
-                    STT_FUNC = 0x2
                     if sym_value == target and sym_info & STT_FUNC != 0:
                         yield API(sym_name), ih.address
 
@@ -155,8 +141,6 @@ def extract_insn_api_features(fh: FunctionHandle, bb, ih: InsnHandle) -> Iterato
             if not target:
                 return
 
-    # call via import on x64
-    # see Lab21-01.exe_:0x14000118C
     elif isinstance(insn.opers[0], envi.archs.amd64.disasm.Amd64RipRelOper):
         op = insn.opers[0]
         target = op.getOperAddr(insn)
@@ -327,14 +311,7 @@ def read_string(vw, offset: int) -> str:
         pass
     else:
         if ulen > 0:
-            if ulen % 2 == 1:
-                # vivisect seems to mis-detect the end unicode strings
-                # off by one, too short
-                ulen += 1
-            else:
-                # vivisect seems to mis-detect the end unicode strings
-                # off by two, too short
-                ulen += 2
+            ulen += 1 if ulen % 2 == 1 else 2
             # partition to account for bug #1271.
             # remove when vivisect is fixed.
             return read_memory(vw, offset, ulen).decode("utf-16").partition("\x00")[0]
@@ -447,8 +424,6 @@ def extract_insn_peb_access_characteristic_features(f, bb, ih: InsnHandle) -> It
                 or (isinstance(oper, envi.archs.amd64.disasm.i386ImmMemOper) and oper.imm == 0x60)
             ):
                 yield Characteristic("peb access"), ih.address
-    else:
-        pass
 
 
 def extract_insn_segment_access_features(f, bb, ih: InsnHandle) -> Iterator[Tuple[Feature, Address]]:
@@ -625,12 +600,6 @@ def extract_op_offset_features(
     fh: FunctionHandle, bb, ih: InsnHandle, i, oper: envi.Operand
 ) -> Iterator[Tuple[Feature, Address]]:
     """parse structure offset features from the given operand."""
-    # example:
-    #
-    #     .text:0040112F    cmp     [esi+4], ebx
-    insn: envi.Opcode = ih.inner
-    f: viv_utils.Function = fh.inner
-
     # this is for both x32 and x64
     # like [esi + 4]
     #       reg   ^
@@ -651,6 +620,12 @@ def extract_op_offset_features(
         yield Offset(v), ih.address
         yield OperandOffset(i, v), ih.address
 
+        # example:
+        #
+        #     .text:0040112F    cmp     [esi+4], ebx
+        insn: envi.Opcode = ih.inner
+        f: viv_utils.Function = fh.inner
+
         if insn.mnem == "lea" and i == 1 and not f.vw.probeMemory(v, 1, envi.memory.MM_READ):
             # for pattern like:
             #
@@ -660,10 +635,6 @@ def extract_op_offset_features(
             yield Number(v), ih.address
             yield OperandNumber(i, v), ih.address
 
-    # like: [esi + ecx + 16384]
-    #        reg   ^     ^
-    #              index ^
-    #                    disp
     elif isinstance(oper, envi.archs.i386.disasm.i386SibOper):
         # viv already decodes offsets as signed
         v = oper.disp
@@ -708,8 +679,7 @@ def extract_op_string_features(
 def extract_operand_features(f: FunctionHandle, bb, insn: InsnHandle) -> Iterator[Tuple[Feature, Address]]:
     for i, oper in enumerate(insn.inner.opers):
         for op_handler in OPERAND_HANDLERS:
-            for feature, addr in op_handler(f, bb, insn, i, oper):
-                yield feature, addr
+            yield from op_handler(f, bb, insn, i, oper)
 
 
 OPERAND_HANDLERS: List[
@@ -734,8 +704,7 @@ def extract_features(f, bb, insn) -> Iterator[Tuple[Feature, Address]]:
       Tuple[Feature, Address]: the features and their location found in this insn.
     """
     for insn_handler in INSTRUCTION_HANDLERS:
-        for feature, addr in insn_handler(f, bb, insn):
-            yield feature, addr
+        yield from insn_handler(f, bb, insn)
 
 
 INSTRUCTION_HANDLERS: List[Callable[[FunctionHandle, BBHandle, InsnHandle], Iterator[Tuple[Feature, Address]]]] = [

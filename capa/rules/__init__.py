@@ -213,10 +213,7 @@ def ensure_feature_valid_for_scope(scope: str, feature: Union[Feature, Statement
 
 
 def parse_int(s: str) -> int:
-    if s.startswith("0x"):
-        return int(s, 0x10)
-    else:
-        return int(s, 10)
+    return int(s, 0x10) if s.startswith("0x") else int(s, 10)
 
 
 def parse_range(s: str):
@@ -323,34 +320,26 @@ def parse_bytes(s: str) -> bytes:
 
 
 def parse_description(s: Union[str, int, bytes], value_type: str, description=None):
-    if value_type == "string":
-        # string features cannot have inline descriptions,
-        # so we assume the entire value is the string,
-        # like: `string: foo = bar` -> "foo = bar"
-        value = s
-    else:
-        # other features can have inline descriptions, like `number: 10 = CONST_FOO`.
-        # in this case, the RHS will be like `10 = CONST_FOO` or some other string
-        if isinstance(s, str):
-            if DESCRIPTION_SEPARATOR in s:
-                if description:
-                    # there is already a description passed in as a sub node, like:
-                    #
-                    #     - number: 10 = CONST_FOO
-                    #       description: CONST_FOO
-                    raise InvalidRule(
-                        f'unexpected value: "{s}", only one description allowed (inline description with `{DESCRIPTION_SEPARATOR}`)'
-                    )
+    if value_type != "string" and isinstance(s, str):
+        if DESCRIPTION_SEPARATOR in s:
+            if description:
+                # there is already a description passed in as a sub node, like:
+                #
+                #     - number: 10 = CONST_FOO
+                #       description: CONST_FOO
+                raise InvalidRule(
+                    f'unexpected value: "{s}", only one description allowed (inline description with `{DESCRIPTION_SEPARATOR}`)'
+                )
 
-                value, _, description = s.partition(DESCRIPTION_SEPARATOR)
-                if description == "":
-                    # sanity check:
-                    # there is an empty description, like `number: 10 =`
-                    raise InvalidRule(f'unexpected value: "{s}", description cannot be empty')
-            else:
-                # this is a string, but there is no description,
-                # like: `api: CreateFileA`
-                value = s
+            value, _, description = s.partition(DESCRIPTION_SEPARATOR)
+            if description == "":
+                # sanity check:
+                # there is an empty description, like `number: 10 =`
+                raise InvalidRule(f'unexpected value: "{s}", description cannot be empty')
+        else:
+            # this is a string, but there is no description,
+            # like: `api: CreateFileA`
+            value = s
 
             # cast from the received string value to the appropriate type.
             #
@@ -360,24 +349,27 @@ def parse_description(s: Union[str, int, bytes], value_type: str, description=No
             #
             # for example, from `number: 10 = CONST_FOO` we have
             # the string "10" that needs to become the number 10.
-            if value_type == "bytes":
-                value = parse_bytes(value)
-            elif (
-                value_type in ("number", "offset")
-                or value_type.startswith(("number/", "offset/"))
-                or (
-                    value_type.startswith("operand[")
-                    and (value_type.endswith("].number") or value_type.endswith("].offset"))
+        if value_type == "bytes":
+            value = parse_bytes(value)
+        elif (
+            value_type in {"number", "offset"}
+            or value_type.startswith(("number/", "offset/"))
+            or (
+                value_type.startswith("operand[")
+                and (
+                    value_type.endswith("].number")
+                    or value_type.endswith("].offset")
                 )
-            ):
-                try:
-                    value = parse_int(value)
-                except ValueError:
-                    raise InvalidRule(f'unexpected value: "{value}", must begin with numerical value')
+            )
+        ):
+            try:
+                value = parse_int(value)
+            except ValueError:
+                raise InvalidRule(f'unexpected value: "{value}", must begin with numerical value')
 
-        else:
-            # the value might be a number, like: `number: 10`
-            value = s
+    else:
+        # the value might be a number, like: `number: 10`
+        value = s
 
     return value, description
 
@@ -669,48 +661,49 @@ class Rule:
         return deps
 
     def _extract_subscope_rules_rec(self, statement):
-        if isinstance(statement, ceng.Statement):
+        if not isinstance(statement, ceng.Statement):
+            return
             # for each child that is a subscope,
-            for child in statement.get_children():
-                if not isinstance(child, ceng.Subscope):
-                    continue
+        for child in statement.get_children():
+            if not isinstance(child, ceng.Subscope):
+                continue
 
-                subscope = child
+            subscope = child
 
                 # create a new rule from it.
                 # the name is a randomly generated, hopefully unique value.
                 # ideally, this won't every be rendered to a user.
-                name = self.name + "/" + uuid.uuid4().hex
-                new_rule = Rule(
-                    name,
-                    subscope.scope,
-                    subscope.child,
-                    {
-                        "name": name,
-                        "scope": subscope.scope,
-                        # these derived rules are never meant to be inspected separately,
-                        # they are dependencies for the parent rule,
-                        # so mark it as such.
-                        "lib": True,
-                        # metadata that indicates this is derived from a subscope statement
-                        "capa/subscope-rule": True,
-                        # metadata that links the child rule the parent rule
-                        "capa/parent": self.name,
-                    },
-                )
+            name = f"{self.name}/{uuid.uuid4().hex}"
+            new_rule = Rule(
+                name,
+                subscope.scope,
+                subscope.child,
+                {
+                    "name": name,
+                    "scope": subscope.scope,
+                    # these derived rules are never meant to be inspected separately,
+                    # they are dependencies for the parent rule,
+                    # so mark it as such.
+                    "lib": True,
+                    # metadata that indicates this is derived from a subscope statement
+                    "capa/subscope-rule": True,
+                    # metadata that links the child rule the parent rule
+                    "capa/parent": self.name,
+                },
+            )
 
-                # update the existing statement to `match` the new rule
-                new_node = capa.features.common.MatchedRule(name)
-                statement.replace_child(subscope, new_node)
+            # update the existing statement to `match` the new rule
+            new_node = capa.features.common.MatchedRule(name)
+            statement.replace_child(subscope, new_node)
 
-                # and yield the new rule to our caller
-                yield new_rule
+            # and yield the new rule to our caller
+            yield new_rule
 
-            # now recurse to other nodes in the logic tree.
-            # note: we cannot recurse into the subscope sub-tree,
-            #  because its been replaced by a `match` statement.
-            for child in statement.get_children():
-                yield from self._extract_subscope_rules_rec(child)
+        # now recurse to other nodes in the logic tree.
+        # note: we cannot recurse into the subscope sub-tree,
+        #  because its been replaced by a `match` statement.
+        for child in statement.get_children():
+            yield from self._extract_subscope_rules_rec(child)
 
     def is_subscope_rule(self):
         return bool(self.meta.get("capa/subscope-rule", False))
@@ -902,7 +895,7 @@ class Rule:
             if value:
                 hidden_meta[key] = value
 
-        for key in hidden_meta.keys():
+        for key in hidden_meta:
             del meta[key]
 
         ostream = io.BytesIO()
@@ -981,7 +974,7 @@ def ensure_rules_are_unique(rules: List[Rule]) -> None:
     seen = set()
     for rule in rules:
         if rule.name in seen:
-            raise InvalidRule("duplicate rule name: " + rule.name)
+            raise InvalidRule(f"duplicate rule name: {rule.name}")
         seen.add(rule.name)
 
 
@@ -1183,17 +1176,7 @@ class RuleSet:
                 # hard feature: requires scan or match lookup
                 rules_with_hard_features.add(rule_name)
             elif isinstance(node, capa.features.common.Feature):
-                if capa.features.common.is_global_feature(node):
-                    # we don't want to index global features
-                    # because they're not very selective.
-                    #
-                    # they're global, so if they match at one location in a file,
-                    # they'll match at every location in a file.
-                    # so thats not helpful to decide how to downselect.
-                    #
-                    # and, a global rule will never be the sole selector in a rule.
-                    pass
-                else:
+                if not capa.features.common.is_global_feature(node):
                     # easy feature: hash lookup
                     rules_with_easy_features.add(rule_name)
                     rules_by_feature[node].add(rule_name)
@@ -1370,8 +1353,7 @@ class RuleSet:
 
         candidate_rule_names = set()
         for feature in features:
-            easy_rule_names = easy_rules_by_feature.get(feature)
-            if easy_rule_names:
+            if easy_rule_names := easy_rules_by_feature.get(feature):
                 candidate_rule_names.update(easy_rule_names)
 
         # first, match against the set of rules that have at least one
@@ -1406,7 +1388,7 @@ class RuleSet:
         # MatchResults doesn't technically have an .update() method
         # but a dict does.
         matches = {}  # type: ignore
-        matches.update(easy_matches)
+        matches |= easy_matches
         matches.update(hard_matches)
 
         return (features3, matches)

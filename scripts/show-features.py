@@ -161,7 +161,7 @@ def main(argv=None):
                 print(f"{args.function} not a function")
                 return -1
 
-        if len(function_handles) == 0:
+        if not function_handles:
             print(f"{args.function} not a function")
             return -1
 
@@ -190,7 +190,7 @@ def ida_main():
     if function:
         function_handles = tuple(filter(lambda fh: fh.inner.start_ea == function, function_handles))
 
-        if len(function_handles) == 0:
+        if not function_handles:
             print(f"{hex(function)} not a function")
             return -1
 

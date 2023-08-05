@@ -60,10 +60,7 @@ def is_mov_imm_to_stack(insn: idaapi.insn_t) -> bool:
     if not helpers.is_op_stack_var(insn.ea, 0):
         return False
 
-    if not insn.get_canon_mnem().startswith("mov"):
-        return False
-
-    return True
+    return bool(insn.get_canon_mnem().startswith("mov"))
 
 
 def bb_contains_stackstring(f: idaapi.func_t, bb: idaapi.BasicBlock) -> bool:
@@ -95,8 +92,7 @@ def extract_bb_tight_loop(fh: FunctionHandle, bbh: BBHandle) -> Iterator[Tuple[F
 def extract_features(fh: FunctionHandle, bbh: BBHandle) -> Iterator[Tuple[Feature, Address]]:
     """extract basic block features"""
     for bb_handler in BASIC_BLOCK_HANDLERS:
-        for feature, addr in bb_handler(fh, bbh):
-            yield feature, addr
+        yield from bb_handler(fh, bbh)
     yield BasicBlock(), bbh.address
 
 

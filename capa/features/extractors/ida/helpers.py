@@ -139,8 +139,7 @@ def get_instructions_in_range(start: int, end: int) -> Iterator[idaapi.insn_t]:
         end: virtual address (exclusive)
     """
     for head in idautils.Heads(start, end):
-        insn = idautils.DecodeInstruction(head)
-        if insn:
+        if insn := idautils.DecodeInstruction(head):
             yield insn
 
 
@@ -161,13 +160,7 @@ def is_operand_equal(op1: idaapi.op_t, op2: idaapi.op_t) -> bool:
     if op1.phrase != op2.phrase:
         return False
 
-    if op1.value != op2.value:
-        return False
-
-    if op1.addr != op2.addr:
-        return False
-
-    return True
+    return False if op1.value != op2.value else op1.addr == op2.addr
 
 
 def is_basic_block_equal(bb1: idaapi.BasicBlock, bb2: idaapi.BasicBlock) -> bool:
@@ -175,13 +168,7 @@ def is_basic_block_equal(bb1: idaapi.BasicBlock, bb2: idaapi.BasicBlock) -> bool
     if bb1.start_ea != bb2.start_ea:
         return False
 
-    if bb1.end_ea != bb2.end_ea:
-        return False
-
-    if bb1.type != bb2.type:
-        return False
-
-    return True
+    return False if bb1.end_ea != bb2.end_ea else bb1.type == bb2.type
 
 
 def basic_block_size(bb: idaapi.BasicBlock) -> int:

@@ -74,12 +74,7 @@ def xfail(condition, reason=None):
             # we don't expect an exception, so the test should fail
             raise
     else:
-        if not condition:
-            # here we expect the block to run successfully,
-            # and we've received no exception,
-            # so this is good
-            pass
-        else:
+        if condition:
             # we expected an exception, but didn't find one. that's an error.
             raise RuntimeError("expected to fail, but didn't")
 

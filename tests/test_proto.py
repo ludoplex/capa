@@ -300,11 +300,7 @@ def assert_statement(a: rd.StatementNode, b: capa_pb2.StatementNode):
     elif isinstance(sa, rd.SubscopeStatement):
         assert capa.render.proto.scope_to_pb2(sa.scope) == sb.scope
 
-    elif isinstance(sa, rd.CompoundStatement):
-        # only has type and description tested above
-        pass
-
-    else:
+    elif not isinstance(sa, rd.CompoundStatement):
         # unhandled statement
         assert_never(sa)
 

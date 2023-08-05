@@ -33,25 +33,25 @@ def interface_extract_function_XXX(fh: FunctionHandle) -> Iterator[Tuple[Feature
 
 
 def extract_function_symtab_names(fh: FunctionHandle) -> Iterator[Tuple[Feature, Address]]:
-    if fh.inner.vw.metadata["Format"] == "elf":
-        # the file's symbol table gets added to the metadata of the vivisect workspace.
-        # this is in order to eliminate the computational overhead of refetching symtab each time.
-        if "symtab" not in fh.ctx["cache"]:
-            try:
-                fh.ctx["cache"]["symtab"] = SymTab.from_Elf(fh.inner.vw.parsedbin)
-            except Exception:
-                fh.ctx["cache"]["symtab"] = None
+    if fh.inner.vw.metadata["Format"] != "elf":
+        return
+    # the file's symbol table gets added to the metadata of the vivisect workspace.
+    # this is in order to eliminate the computational overhead of refetching symtab each time.
+    if "symtab" not in fh.ctx["cache"]:
+        try:
+            fh.ctx["cache"]["symtab"] = SymTab.from_Elf(fh.inner.vw.parsedbin)
+        except Exception:
+            fh.ctx["cache"]["symtab"] = None
 
-        symtab = fh.ctx["cache"]["symtab"]
-        if symtab:
-            for symbol in symtab.get_symbols():
-                sym_name = symtab.get_name(symbol)
-                sym_value = symbol.value
-                sym_info = symbol.info
+    if symtab := fh.ctx["cache"]["symtab"]:
+        STT_FUNC = 0x2
+        for symbol in symtab.get_symbols():
+            sym_name = symtab.get_name(symbol)
+            sym_value = symbol.value
+            sym_info = symbol.info
 
-                STT_FUNC = 0x2
-                if sym_value == fh.address and sym_info & STT_FUNC != 0:
-                    yield FunctionName(sym_name), fh.address
+            if sym_value == fh.address and sym_info & STT_FUNC != 0:
+                yield FunctionName(sym_name), fh.address
 
 
 def extract_function_calls_to(fhandle: FunctionHandle) -> Iterator[Tuple[Feature, Address]]:
@@ -99,8 +99,7 @@ def extract_features(fh: FunctionHandle) -> Iterator[Tuple[Feature, Address]]:
       Tuple[Feature, int]: the features and their location found in this function.
     """
     for func_handler in FUNCTION_HANDLERS:
-        for feature, addr in func_handler(fh):
-            yield feature, addr
+        yield from func_handler(fh)
 
 
 FUNCTION_HANDLERS = (

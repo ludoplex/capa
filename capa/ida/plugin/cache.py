@@ -69,9 +69,8 @@ class CapaRuleGenFeatureCache:
             # the set of addresses will still be empty.
             if addr is not None:
                 self.global_features[feature].add(addr)
-            else:
-                if feature not in self.global_features:
-                    self.global_features[feature] = set()
+            elif feature not in self.global_features:
+                self.global_features[feature] = set()
 
     def _find_file_features(self):
         # not all file features may have virtual addresses.
@@ -80,9 +79,8 @@ class CapaRuleGenFeatureCache:
         for feature, addr in self.extractor.extract_file_features():
             if addr is not None:
                 self.file_node.features[feature].add(addr)
-            else:
-                if feature not in self.file_node.features:
-                    self.file_node.features[feature] = set()
+            elif feature not in self.file_node.features:
+                self.file_node.features[feature] = set()
 
     def _find_function_and_below_features(self, fh: FunctionHandle):
         f_node: CapaRuleGenFeatureCacheNode = CapaRuleGenFeatureCacheNode(fh, self.file_node)

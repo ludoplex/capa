@@ -47,11 +47,9 @@ class BinjaFeatureExtractor(FeatureExtractor):
 
     def get_basic_blocks(self, fh: FunctionHandle) -> Iterator[BBHandle]:
         f: binja.Function = fh.inner
-        # Set up a MLIL basic block dict look up to associate the disassembly basic block with its MLIL basic block
-        mlil_lookup = {}
-        for mlil_bb in f.mlil.basic_blocks:
-            mlil_lookup[mlil_bb.source_block.start] = mlil_bb
-
+        mlil_lookup = {
+            mlil_bb.source_block.start: mlil_bb for mlil_bb in f.mlil.basic_blocks
+        }
         for bb in f.basic_blocks:
             mlil_bb = mlil_lookup.get(bb.start)
 

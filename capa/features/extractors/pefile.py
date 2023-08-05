@@ -30,30 +30,31 @@ def extract_file_embedded_pe(buf, **kwargs):
 
 
 def extract_file_export_names(pe, **kwargs):
+    if not hasattr(pe, "DIRECTORY_ENTRY_EXPORT"):
+        return
     base_address = pe.OPTIONAL_HEADER.ImageBase
 
-    if hasattr(pe, "DIRECTORY_ENTRY_EXPORT"):
-        for export in pe.DIRECTORY_ENTRY_EXPORT.symbols:
-            if not export.name:
-                continue
+    for export in pe.DIRECTORY_ENTRY_EXPORT.symbols:
+        if not export.name:
+            continue
+        try:
+            name = export.name.partition(b"\x00")[0].decode("ascii")
+        except UnicodeDecodeError:
+            continue
+
+        if export.forwarder is None:
+            va = base_address + export.address
+            yield Export(name), AbsoluteVirtualAddress(va)
+
+        else:
             try:
-                name = export.name.partition(b"\x00")[0].decode("ascii")
+                forwarded_name = export.forwarder.partition(b"\x00")[0].decode("ascii")
             except UnicodeDecodeError:
                 continue
-
-            if export.forwarder is None:
-                va = base_address + export.address
-                yield Export(name), AbsoluteVirtualAddress(va)
-
-            else:
-                try:
-                    forwarded_name = export.forwarder.partition(b"\x00")[0].decode("ascii")
-                except UnicodeDecodeError:
-                    continue
-                forwarded_name = capa.features.extractors.helpers.reformat_forwarded_export_name(forwarded_name)
-                va = base_address + export.address
-                yield Export(forwarded_name), AbsoluteVirtualAddress(va)
-                yield Characteristic("forwarded export"), AbsoluteVirtualAddress(va)
+            forwarded_name = capa.features.extractors.helpers.reformat_forwarded_export_name(forwarded_name)
+            va = base_address + export.address
+            yield Export(forwarded_name), AbsoluteVirtualAddress(va)
+            yield Characteristic("forwarded export"), AbsoluteVirtualAddress(va)
 
 
 def extract_file_import_names(pe, **kwargs):
@@ -65,27 +66,28 @@ def extract_file_import_names(pe, **kwargs):
      - modulename.importname
      - importname
     """
-    if hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
-        for dll in pe.DIRECTORY_ENTRY_IMPORT:
-            try:
-                modname = dll.dll.partition(b"\x00")[0].decode("ascii")
-            except UnicodeDecodeError:
-                continue
+    if not hasattr(pe, "DIRECTORY_ENTRY_IMPORT"):
+        return
+    for dll in pe.DIRECTORY_ENTRY_IMPORT:
+        try:
+            modname = dll.dll.partition(b"\x00")[0].decode("ascii")
+        except UnicodeDecodeError:
+            continue
 
-            # strip extension
-            modname = modname.rpartition(".")[0].lower()
+        # strip extension
+        modname = modname.rpartition(".")[0].lower()
 
-            for imp in dll.imports:
-                if imp.import_by_ordinal:
-                    impname = f"#{imp.ordinal}"
-                else:
-                    try:
-                        impname = imp.name.partition(b"\x00")[0].decode("ascii")
-                    except UnicodeDecodeError:
-                        continue
+        for imp in dll.imports:
+            if imp.import_by_ordinal:
+                impname = f"#{imp.ordinal}"
+            else:
+                try:
+                    impname = imp.name.partition(b"\x00")[0].decode("ascii")
+                except UnicodeDecodeError:
+                    continue
 
-                for name in capa.features.extractors.helpers.generate_symbols(modname, impname):
-                    yield Import(name), AbsoluteVirtualAddress(imp.address)
+            for name in capa.features.extractors.helpers.generate_symbols(modname, impname):
+                yield Import(name), AbsoluteVirtualAddress(imp.address)
 
 
 def extract_file_section_names(pe, **kwargs):
@@ -108,9 +110,6 @@ def extract_file_function_names(**kwargs):
     """
     extract the names of statically-linked library functions.
     """
-    if False:
-        # using a `yield` here to force this to be a generator, not function.
-        yield NotImplementedError("pefile doesn't have library matching")
     return
 
 
@@ -147,8 +146,7 @@ def extract_file_features(pe, buf):
 
     for file_handler in FILE_HANDLERS:
         # file_handler: type: (pe, bytes) -> Iterable[Tuple[Feature, Address]]
-        for feature, va in file_handler(pe=pe, buf=buf):  # type: ignore
-            yield feature, va
+        yield from file_handler(pe=pe, buf=buf)
 
 
 FILE_HANDLERS = (
@@ -175,8 +173,7 @@ def extract_global_features(pe, buf):
     """
     for handler in GLOBAL_HANDLERS:
         # file_handler: type: (pe, bytes) -> Iterable[Tuple[Feature, Address]]
-        for feature, va in handler(pe=pe, buf=buf):  # type: ignore
-            yield feature, va
+        yield from handler(pe=pe, buf=buf)
 
 
 GLOBAL_HANDLERS = (

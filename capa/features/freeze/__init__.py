@@ -114,12 +114,11 @@ class Address(HashableModel):
         if self.type is AddressType.NO_ADDRESS:
             return True
 
-        else:
-            assert self.type == other.type
-            # mypy doesn't realize we've proven that either
-            # both are ints, or both are tuples of ints.
-            # and both of these are comparable.
-            return self.value < other.value  # type: ignore
+        assert self.type == other.type
+        # mypy doesn't realize we've proven that either
+        # both are ints, or both are tuples of ints.
+        # and both of these are comparable.
+        return self.value < other.value  # type: ignore
 
 
 class GlobalFeature(HashableModel):
@@ -231,14 +230,12 @@ def dumps(extractor: capa.features.extractors.base_extractor.FeatureExtractor) -
     serialize the given extractor to a string
     """
 
-    global_features: List[GlobalFeature] = []
-    for feature, _ in extractor.extract_global_features():
-        global_features.append(
-            GlobalFeature(
-                feature=feature_from_capa(feature),
-            )
+    global_features: List[GlobalFeature] = [
+        GlobalFeature(
+            feature=feature_from_capa(feature),
         )
-
+        for feature, _ in extractor.extract_global_features()
+    ]
     file_features: List[FileFeature] = []
     for feature, address in extractor.extract_file_features():
         file_features.append(

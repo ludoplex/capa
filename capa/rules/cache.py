@@ -52,7 +52,7 @@ def get_default_cache_directory() -> Path:
     # MacOS:   ~/Library/Caches/capa
 
     # ref: https://stackoverflow.com/a/8220141/87207
-    if sys.platform == "linux" or sys.platform == "linux2":
+    if sys.platform in ["linux", "linux2"]:
         directory = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache" / "capa"))
     elif sys.platform == "darwin":
         directory = Path.home() / "Library" / "Caches" / "capa"
@@ -67,7 +67,7 @@ def get_default_cache_directory() -> Path:
 
 
 def get_cache_path(cache_dir: Path, id: CacheIdentifier) -> Path:
-    filename = "capa-" + id[:8] + ".cache"
+    filename = f"capa-{id[:8]}.cache"
     return cache_dir / filename
 
 
@@ -97,12 +97,11 @@ class RuleCache:
 
 
 def get_ruleset_content(ruleset: capa.rules.RuleSet) -> List[bytes]:
-    rule_contents = []
-    for rule in ruleset.rules.values():
-        if rule.is_subscope_rule():
-            continue
-        rule_contents.append(rule.definition.encode("utf-8"))
-    return rule_contents
+    return [
+        rule.definition.encode("utf-8")
+        for rule in ruleset.rules.values()
+        if not rule.is_subscope_rule()
+    ]
 
 
 def compute_ruleset_cache_identifier(ruleset: capa.rules.RuleSet) -> CacheIdentifier:

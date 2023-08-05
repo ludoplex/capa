@@ -27,12 +27,10 @@ def display_top(snapshot, key_type="lineno", limit=10):
     for index, stat in enumerate(top_stats[:limit], 1):
         frame = stat.traceback[0]
         print(f"#{index}: {frame.filename}:{frame.lineno}: {(stat.size/1024):.1f} KiB")
-        line = linecache.getline(frame.filename, frame.lineno).strip()
-        if line:
+        if line := linecache.getline(frame.filename, frame.lineno).strip():
             print(f"    {line}")
 
-    other = top_stats[limit:]
-    if other:
+    if other := top_stats[limit:]:
         size = sum(stat.size for stat in other)
         print(f"{len(other)} other: {(size/1024):.1f} KiB")
     total = sum(stat.size for stat in top_stats)

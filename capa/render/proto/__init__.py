@@ -39,13 +39,7 @@ from capa.features.freeze import AddressType
 
 
 def dict_tuple_to_list_values(d: Dict) -> Dict:
-    o = {}
-    for k, v in d.items():
-        if isinstance(v, tuple):
-            o[k] = list(v)
-        else:
-            o[k] = v
-    return o
+    return {k: list(v) if isinstance(v, tuple) else v for k, v in d.items()}
 
 
 def int_to_pb2(v: int) -> capa_pb2.Integer:
@@ -54,10 +48,7 @@ def int_to_pb2(v: int) -> capa_pb2.Integer:
     if v > 0xFFFFFFFFFFFFFFFF:
         raise ValueError(f"value overflow: {v}")
 
-    if v < 0:
-        return capa_pb2.Integer(i=v)
-    else:
-        return capa_pb2.Integer(u=v)
+    return capa_pb2.Integer(i=v) if v < 0 else capa_pb2.Integer(u=v)
 
 
 def number_to_pb2(v: Union[int, float]) -> capa_pb2.Number:
@@ -65,10 +56,7 @@ def number_to_pb2(v: Union[int, float]) -> capa_pb2.Number:
         return capa_pb2.Number(f=v)
     elif isinstance(v, int):
         i = int_to_pb2(v)
-        if v < 0:
-            return capa_pb2.Number(i=i.i)
-        else:
-            return capa_pb2.Number(u=i.u)
+        return capa_pb2.Number(i=i.i) if v < 0 else capa_pb2.Number(u=i.u)
     else:
         assert_never(v)
 
@@ -414,9 +402,9 @@ def doc_to_pb2(doc: rd.ResultDocument) -> capa_pb2.ResultDocument:
         )
         rule_matches[rule_name] = m
 
-    r = capa_pb2.ResultDocument(meta=metadata_to_pb2(doc.meta), rules=rule_matches)
-
-    return r
+    return capa_pb2.ResultDocument(
+        meta=metadata_to_pb2(doc.meta), rules=rule_matches
+    )
 
 
 def int_from_pb2(v: capa_pb2.Integer) -> int:
@@ -499,34 +487,32 @@ def metadata_from_pb2(meta: capa_pb2.Metadata) -> rd.Metadata:
             base_address=addr_from_pb2(meta.analysis.base_address),
             layout=rd.Layout(
                 functions=tuple(
-                    [
-                        rd.FunctionLayout(
-                            address=addr_from_pb2(f.address),
-                            matched_basic_blocks=tuple(
-                                [
-                                    rd.BasicBlockLayout(address=addr_from_pb2(bb.address))
-                                    for bb in f.matched_basic_blocks
-                                ]
-                            ),
-                        )
-                        for f in meta.analysis.layout.functions
-                    ]
+                    rd.FunctionLayout(
+                        address=addr_from_pb2(f.address),
+                        matched_basic_blocks=tuple(
+                            rd.BasicBlockLayout(
+                                address=addr_from_pb2(bb.address)
+                            )
+                            for bb in f.matched_basic_blocks
+                        ),
+                    )
+                    for f in meta.analysis.layout.functions
                 )
             ),
             feature_counts=rd.FeatureCounts(
                 file=meta.analysis.feature_counts.file,
                 functions=tuple(
-                    [
-                        rd.FunctionFeatureCount(address=addr_from_pb2(f.address), count=f.count)
-                        for f in meta.analysis.feature_counts.functions
-                    ]
+                    rd.FunctionFeatureCount(
+                        address=addr_from_pb2(f.address), count=f.count
+                    )
+                    for f in meta.analysis.feature_counts.functions
                 ),
             ),
             library_functions=tuple(
-                [
-                    rd.LibraryFunction(address=addr_from_pb2(lf.address), name=lf.name)
-                    for lf in meta.analysis.library_functions
-                ]
+                rd.LibraryFunction(
+                    address=addr_from_pb2(lf.address), name=lf.name
+                )
+                for lf in meta.analysis.library_functions
             ),
         ),
     )
@@ -712,15 +698,15 @@ def rule_metadata_from_pb2(pb: capa_pb2.RuleMetadata) -> rd.RuleMetadata:
         namespace=pb.namespace or None,
         authors=tuple(pb.authors),
         scope=scope_from_pb2(pb.scope),
-        attack=tuple([attack_from_pb2(attack) for attack in pb.attack]),
-        mbc=tuple([mbc_from_pb2(mbc) for mbc in pb.mbc]),
+        attack=tuple(attack_from_pb2(attack) for attack in pb.attack),
+        mbc=tuple(mbc_from_pb2(mbc) for mbc in pb.mbc),
         references=tuple(pb.references),
         examples=tuple(pb.examples),
         description=pb.description,
         lib=pb.lib,
         is_subscope_rule=pb.is_subscope_rule,
         maec=maec_from_pb2(pb.maec),
-    )  # type: ignore
+    )
     # Mypy is unable to recognise `attack` and `is_subscope_rule` as arguments due to alias
 
 
@@ -730,7 +716,10 @@ def doc_from_pb2(doc: capa_pb2.ResultDocument) -> rd.ResultDocument:
         m = rd.RuleMatches(
             meta=rule_metadata_from_pb2(matches.meta),
             source=matches.source,
-            matches=tuple([(addr_from_pb2(pair.address), match_from_pb2(pair.match)) for pair in matches.matches]),
+            matches=tuple(
+                (addr_from_pb2(pair.address), match_from_pb2(pair.match))
+                for pair in matches.matches
+            ),
         )
         rule_matches[rule_name] = m
 
