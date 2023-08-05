@@ -116,9 +116,7 @@ class CapaExplorerDataItem:
 
     def row(self) -> int:
         """get row location"""
-        if self.pred:
-            return self.pred._children.index(self)
-        return 0
+        return self.pred._children.index(self) if self.pred else 0
 
     def setData(self, column: int, value: str):
         """set data in column

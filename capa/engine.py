@@ -209,7 +209,7 @@ class Some(Statement):
             # because we've overridden `__bool__` above.
             #
             # we can't use `if child is True` because the instance is not True.
-            success = sum([1 for child in results if bool(child) is True]) >= self.count
+            success = sum(1 for child in results if bool(child)) >= self.count
             return Result(success, self, results)
 
 
@@ -280,8 +280,7 @@ def index_rule_matches(features: FeatureSet, rule: "capa.rules.Rule", locations:
     updates `features` in-place. doesn't modify the remaining arguments.
     """
     features[capa.features.common.MatchedRule(rule.name)].update(locations)
-    namespace = rule.meta.get("namespace")
-    if namespace:
+    if namespace := rule.meta.get("namespace"):
         while namespace:
             features[capa.features.common.MatchedRule(namespace)].update(locations)
             namespace, _, _ = namespace.rpartition("/")
@@ -313,8 +312,7 @@ def match(rules: List["capa.rules.Rule"], features: FeatureSet, addr: Address) -
     features = collections.defaultdict(set, copy.copy(features))
 
     for rule in rules:
-        res = rule.evaluate(features, short_circuit=True)
-        if res:
+        if res := rule.evaluate(features, short_circuit=True):
             # we first matched the rule with short circuiting enabled.
             # this is much faster than without short circuiting.
             # however, we want to collect all results thoroughly,
@@ -323,7 +321,7 @@ def match(rules: List["capa.rules.Rule"], features: FeatureSet, addr: Address) -
             res = rule.evaluate(features, short_circuit=False)
 
             # sanity check
-            assert bool(res) is True
+            assert bool(res)
 
             results[rule.name].append((addr, res))
             # we need to update the current `features`

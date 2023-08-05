@@ -42,7 +42,7 @@ def render_locations(ostream, locations: Iterable[frz.Address]):
     elif len(locations) > 4:
         # don't display too many locations, because it becomes very noisy.
         # probably only the first handful of locations will be useful for inspection.
-        ostream.write(", ".join(map(v.format_address, locations[0:4])))
+        ostream.write(", ".join(map(v.format_address, locations[:4])))
         ostream.write(f", and {(len(locations) - 4)} more...")
 
     elif len(locations) > 1:
@@ -88,9 +88,7 @@ def render_statement(ostream, match: rd.Match, statement: rd.Statement, indent=0
         # so, we have to inline some of the feature rendering here.
 
         child = statement.child
-        value = child.dict(by_alias=True).get(child.type)
-
-        if value:
+        if value := child.dict(by_alias=True).get(child.type):
             if isinstance(child, frzf.StringFeature):
                 value = f'"{capa.features.common.escape_string(value)}"'
 
@@ -118,7 +116,7 @@ def render_statement(ostream, match: rd.Match, statement: rd.Statement, indent=0
         ostream.writeln("")
 
     else:
-        raise RuntimeError("unexpected match statement type: " + str(statement))
+        raise RuntimeError(f"unexpected match statement type: {str(statement)}")
 
 
 def render_string_value(s: str) -> str:
@@ -203,7 +201,7 @@ def render_node(ostream, match: rd.Match, node: rd.Node, indent=0):
     elif isinstance(node, rd.FeatureNode):
         render_feature(ostream, match, node.feature, indent=indent)
     else:
-        raise RuntimeError("unexpected node type: " + str(node))
+        raise RuntimeError(f"unexpected node type: {str(node)}")
 
 
 # display nodes that successfully evaluated against the sample.
@@ -235,16 +233,15 @@ def render_match(ostream, match: rd.Match, indent=0, mode=MODE_SUCCESS):
         if match.success:
             return
 
-        # optional statement with successful children is not relevant
-        if isinstance(match.node, rd.StatementNode) and match.node.statement.type == rd.CompoundStatementType.OPTIONAL:
-            if any(m.success for m in match.children):
+        if any(m.success for m in match.children):
+            if isinstance(match.node, rd.StatementNode) and match.node.statement.type == rd.CompoundStatementType.OPTIONAL:
                 return
 
         # not statement, so invert the child mode to show successful evaluations
         if isinstance(match.node, rd.StatementNode) and match.node.statement.type == rd.CompoundStatementType.NOT:
             child_mode = MODE_SUCCESS
     else:
-        raise RuntimeError("unexpected mode: " + mode)
+        raise RuntimeError(f"unexpected mode: {mode}")
 
     render_node(ostream, match, match.node, indent=indent)
 
@@ -321,10 +318,12 @@ def render_rules(ostream, doc: rd.ResultDocument):
                 ("maec/malware-category", rule.meta.maec.malware_category or rule.meta.maec.malware_category_ov)
             )
 
-        rows.append(("author", ", ".join(rule.meta.authors)))
-
-        rows.append(("scope", rule.meta.scope.value))
-
+        rows.extend(
+            (
+                ("author", ", ".join(rule.meta.authors)),
+                ("scope", rule.meta.scope.value),
+            )
+        )
         if rule.meta.attack:
             rows.append(("att&ck", ", ".join([rutils.format_parts_id(v) for v in rule.meta.attack])))
 
@@ -357,8 +356,7 @@ def render_rules(ostream, doc: rd.ResultDocument):
 
                 if rule.meta.scope == capa.rules.BASIC_BLOCK_SCOPE:
                     ostream.write(
-                        " in function "
-                        + capa.render.verbose.format_address(frz.Address.from_capa(functions_by_bb[location.to_capa()]))
+                        f" in function {capa.render.verbose.format_address(frz.Address.from_capa(functions_by_bb[location.to_capa()]))}"
                     )
 
                 ostream.write("\n")

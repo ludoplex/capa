@@ -48,10 +48,7 @@ def resolve_dotnet_token(pe: dnfile.dnPE, token: Token) -> Union[dnfile.base.MDT
 
     if isinstance(token, StringToken):
         user_string: Optional[str] = read_dotnet_user_string(pe, token)
-        if user_string is None:
-            return InvalidToken(token.value)
-        return user_string
-
+        return InvalidToken(token.value) if user_string is None else user_string
     table: Optional[dnfile.base.ClrMetaDataTable] = pe.net.mdtables.tables.get(token.table)
     if table is None:
         # table index is not valid
@@ -88,10 +85,7 @@ def read_dotnet_user_string(pe: dnfile.dnPE, token: StringToken) -> Optional[str
         logger.debug("failed to decode #US stream index 0x%08x (%s)", token.rid, e)
         return None
 
-    if user_string is None:
-        return None
-
-    return user_string.value
+    return None if user_string is None else user_string.value
 
 
 def get_dotnet_managed_imports(pe: dnfile.dnPE) -> Iterator[DnType]:
@@ -188,10 +182,9 @@ def get_dotnet_managed_methods(pe: dnfile.dnPE) -> Iterator[DnType]:
             TypeNamespace (index into String heap)
             MethodList (index into MethodDef table; it marks the first of a contiguous run of Methods owned by this Type)
     """
-    accessor_map: Dict[int, str] = {}
-    for methoddef, methoddef_access in get_dotnet_methoddef_property_accessors(pe):
-        accessor_map[methoddef] = methoddef_access
-
+    accessor_map: Dict[int, str] = dict(
+        get_dotnet_methoddef_property_accessors(pe)
+    )
     for rid, typedef in iter_dotnet_table(pe, dnfile.mdtable.TypeDef.number):
         assert isinstance(typedef, dnfile.mdtable.TypeDefRow)
 

@@ -40,8 +40,8 @@ def _bb_has_tight_loop(f, bb):
     """
     if len(bb.instructions) > 0:
         for bva, bflags in bb.instructions[-1].getBranches():
-            if bflags & envi.BR_COND:
-                if bva == bb.va:
+            if bva == bb.va:
+                if bflags & envi.BR_COND:
                     return True
 
     return False
@@ -101,10 +101,7 @@ def is_mov_imm_to_stack(instr: envi.archs.i386.disasm.i386Opcode) -> bool:
         return False
 
     rname = dst._dis_regctx.getRegisterName(dst.reg)
-    if rname not in ["ebp", "rbp", "esp", "rsp"]:
-        return False
-
-    return True
+    return rname in ["ebp", "rbp", "esp", "rsp"]
 
 
 def get_printable_len(oper: envi.archs.i386.disasm.i386ImmOper) -> int:
@@ -158,8 +155,7 @@ def extract_features(f: FunctionHandle, bb: BBHandle) -> Iterator[Tuple[Feature,
     """
     yield BasicBlock(), AbsoluteVirtualAddress(bb.inner.va)
     for bb_handler in BASIC_BLOCK_HANDLERS:
-        for feature, addr in bb_handler(f, bb):
-            yield feature, addr
+        yield from bb_handler(f, bb)
 
 
 BASIC_BLOCK_HANDLERS = (

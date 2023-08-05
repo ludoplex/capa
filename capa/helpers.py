@@ -26,17 +26,13 @@ logger = logging.getLogger("capa")
 
 def hex(n: int) -> str:
     """render the given number using upper case hex, like: 0x123ABC"""
-    if n < 0:
-        return f"-0x{(-n):X}"
-    else:
-        return f"0x{(n):X}"
+    return f"-0x{-n:X}" if n < 0 else f"0x{n:X}"
 
 
 def get_file_taste(sample_path: Path) -> bytes:
     if not sample_path.exists():
         raise IOError(f"sample path {sample_path} does not exist or cannot be accessed")
-    taste = sample_path.open("rb").read(8)
-    return taste
+    return sample_path.open("rb").read(8)
 
 
 def is_runtime_ida():

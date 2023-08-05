@@ -14,10 +14,7 @@ from capa.features.common import VALID_FEATURE_ACCESS, Feature
 
 def hex(n: int) -> str:
     """render the given number using upper case hex, like: 0x123ABC"""
-    if n < 0:
-        return f"-0x{(-n):X}"
-    else:
-        return f"0x{(n):X}"
+    return f"-0x{-n:X}" if n < 0 else f"0x{n:X}"
 
 
 class API(Feature):
@@ -41,9 +38,7 @@ class _AccessFeature(Feature, abc.ABC):
         return super().__eq__(other) and self.access == other.access
 
     def get_name_str(self) -> str:
-        if self.access is not None:
-            return f"{self.name}/{self.access}"
-        return self.name
+        return f"{self.name}/{self.access}" if self.access is not None else self.name
 
 
 class Property(_AccessFeature):

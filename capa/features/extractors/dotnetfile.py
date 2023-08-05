@@ -138,8 +138,7 @@ def extract_file_mixed_mode_characteristic_features(
 
 def extract_file_features(pe: dnfile.dnPE) -> Iterator[Tuple[Feature, Address]]:
     for file_handler in FILE_HANDLERS:
-        for feature, addr in file_handler(pe=pe):  # type: ignore
-            yield feature, addr
+        yield from file_handler(pe=pe)
 
 
 FILE_HANDLERS = (
@@ -155,8 +154,7 @@ FILE_HANDLERS = (
 
 def extract_global_features(pe: dnfile.dnPE) -> Iterator[Tuple[Feature, Address]]:
     for handler in GLOBAL_HANDLERS:
-        for feature, va in handler(pe=pe):  # type: ignore
-            yield feature, va
+        yield from handler(pe=pe)
 
 
 GLOBAL_HANDLERS = (

@@ -22,23 +22,14 @@ def is_aw_function(symbol: str) -> bool:
     is the given function name an A/W function?
     these are variants of functions that, on Windows, accept either a narrow or wide string.
     """
-    if len(symbol) < 2:
-        return False
-
-    # last character should be 'A' or 'W'
-    if symbol[-1] not in ("A", "W"):
-        return False
-
-    return True
+    return False if len(symbol) < 2 else symbol[-1] in ("A", "W")
 
 
 def is_ordinal(symbol: str) -> bool:
     """
     is the given symbol an ordinal that is prefixed by "#"?
     """
-    if symbol:
-        return symbol[0] == "#"
-    return False
+    return symbol[0] == "#" if symbol else False
 
 
 def generate_symbols(dll: str, symbol: str) -> Iterator[str]:
@@ -98,12 +89,7 @@ def twos_complement(val: int, bits: int) -> int:
     from: https://stackoverflow.com/a/9147327/87207
     """
     # if sign bit is set e.g., 8bit: 128-255
-    if (val & (1 << (bits - 1))) != 0:
-        # compute negative value
-        return val - (1 << bits)
-    else:
-        # return positive value as is
-        return val
+    return val - (1 << bits) if (val & (1 << (bits - 1))) != 0 else val
 
 
 def carve_pe(pbytes: bytes, offset: int = 0) -> Iterator[Tuple[int, int]]:

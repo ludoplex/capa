@@ -44,9 +44,12 @@ def check_segment_for_pe(seg: idaapi.segment_t) -> Iterator[Tuple[int, int]]:
     todo = []
     for mzx, pex, i in mz_xor:
         # find all segment offsets containing XOR'd "MZ" bytes
-        for off in capa.features.extractors.ida.helpers.find_byte_sequence(seg.start_ea, seg.end_ea, mzx):
-            todo.append((off, mzx, pex, i))
-
+        todo.extend(
+            (off, mzx, pex, i)
+            for off in capa.features.extractors.ida.helpers.find_byte_sequence(
+                seg.start_ea, seg.end_ea, mzx
+            )
+        )
     while len(todo):
         off, mzx, pex, i = todo.pop()
 
@@ -193,8 +196,7 @@ def extract_file_format() -> Iterator[Tuple[Feature, Address]]:
 def extract_features() -> Iterator[Tuple[Feature, Address]]:
     """extract file features"""
     for file_handler in FILE_HANDLERS:
-        for feature, addr in file_handler():
-            yield feature, addr
+        yield from file_handler()
 
 
 FILE_HANDLERS = (

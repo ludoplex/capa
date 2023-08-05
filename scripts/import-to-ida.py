@@ -55,11 +55,7 @@ def append_func_cmt(va, cmt, repeatable=False):
     if cmt in existing:
         return
 
-    if len(existing) > 0:
-        new = existing + "\n" + cmt
-    else:
-        new = cmt
-
+    new = existing + "\n" + cmt if len(existing) > 0 else cmt
     ida_funcs.set_func_cmt(func, new, repeatable)
 
 
@@ -104,17 +100,13 @@ def main():
     # order by (namespace, name) so that like things show up together
     rows = sorted(rows)
     for ns, name, va in rows:
-        if ns:
-            cmt = name + f"({ns})"
-        else:
-            cmt = name
-
+        cmt = f"{name}({ns})" if ns else name
         logger.info("0x%x: %s", va, cmt)
         try:
             # message will look something like:
             #
             #     capa: delete service (host-interaction/service/delete)
-            append_func_cmt(va, "capa: " + cmt, repeatable=False)
+            append_func_cmt(va, f"capa: {cmt}", repeatable=False)
         except ValueError:
             continue
 

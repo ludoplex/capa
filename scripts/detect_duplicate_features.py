@@ -84,8 +84,7 @@ def find_overlapping_rules(new_rule_path, rules_path):
         if any(feature in rule_features for feature in new_rule_features):
             overlapping_rules.append(rule_name)
 
-    result = {"overlapping_rules": overlapping_rules, "count": count}
-    return result
+    return {"overlapping_rules": overlapping_rules, "count": count}
 
 
 def main():
@@ -102,14 +101,16 @@ def main():
     result = find_overlapping_rules(new_rule_path, rules_path)
 
     print("\nNew rule path : %s" % new_rule_path)
-    print("Number of rules checked : %s " % result["count"])
+    print(f'Number of rules checked : {result["count"]} ')
     if result["overlapping_rules"]:
         print("Paths to overlapping rules : ")
         for r in result["overlapping_rules"]:
-            print("- %s" % r)
+            print(f"- {r}")
     else:
         print("Paths to overlapping rules : None")
-    print("Number of rules containing same features : %s" % len(result["overlapping_rules"]))
+    print(
+        f'Number of rules containing same features : {len(result["overlapping_rules"])}'
+    )
     print("\n")
 
     return len(result["overlapping_rules"])

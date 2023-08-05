@@ -43,9 +43,10 @@ def check_segment_for_pe(bv: BinaryView, seg: Segment) -> Iterator[Tuple[int, in
         start += 1
 
     for mzx, pex, i in mz_xor:
-        for off, _ in bv.find_all_data(start, seg.end, mzx):
-            todo.append((off, mzx, pex, i))
-
+        todo.extend(
+            (off, mzx, pex, i)
+            for off, _ in bv.find_all_data(start, seg.end, mzx)
+        )
     while len(todo):
         off, mzx, pex, i = todo.pop()
 
@@ -152,8 +153,7 @@ def extract_file_format(bv: BinaryView) -> Iterator[Tuple[Feature, Address]]:
 def extract_features(bv: BinaryView) -> Iterator[Tuple[Feature, Address]]:
     """extract file features"""
     for file_handler in FILE_HANDLERS:
-        for feature, addr in file_handler(bv):
-            yield feature, addr
+        yield from file_handler(bv)
 
 
 FILE_HANDLERS = (

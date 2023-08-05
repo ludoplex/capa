@@ -29,10 +29,11 @@ from capa.features.basicblock import BasicBlock
 from capa.features.extractors.helpers import MIN_STACKSTRING_LEN
 from capa.features.extractors.base_extractor import BBHandle, FunctionHandle
 
-use_const_outline: bool = False
 settings: Settings = Settings()
-if settings.contains("analysis.outlining.builtins") and settings.get_bool("analysis.outlining.builtins"):
-    use_const_outline = True
+use_const_outline = bool(
+    settings.contains("analysis.outlining.builtins")
+    and settings.get_bool("analysis.outlining.builtins")
+)
 
 
 def get_printable_len_ascii(s: bytes) -> int:
@@ -48,9 +49,11 @@ def get_printable_len_ascii(s: bytes) -> int:
 
 def get_printable_len_wide(s: bytes) -> int:
     """Return string length if all operand bytes are ascii or utf16-le printable"""
-    if all(c == 0x00 for c in s[1::2]):
-        return get_printable_len_ascii(s[::2])
-    return 0
+    return (
+        get_printable_len_ascii(s[::2])
+        if all(c == 0x00 for c in s[1::2])
+        else 0
+    )
 
 
 def get_stack_string_len(f: Function, il: MediumLevelILInstruction) -> int:
@@ -117,10 +120,7 @@ def get_printable_len(il: MediumLevelILSetVar) -> int:
     if is_printable_ascii(chars):
         return width
 
-    if is_printable_utf16le(chars):
-        return width // 2
-
-    return 0
+    return width // 2 if is_printable_utf16le(chars) else 0
 
 
 def is_mov_imm_to_stack(il: MediumLevelILInstruction) -> bool:
@@ -131,10 +131,7 @@ def is_mov_imm_to_stack(il: MediumLevelILInstruction) -> bool:
     if il.src.operation != MediumLevelILOperation.MLIL_CONST:
         return False
 
-    if il.dest.source_type != VariableSourceType.StackVariableSourceType:
-        return False
-
-    return True
+    return il.dest.source_type == VariableSourceType.StackVariableSourceType
 
 
 def bb_contains_stackstring(f: Function, bb: MediumLevelILBasicBlock) -> bool:
@@ -146,13 +143,10 @@ def bb_contains_stackstring(f: Function, bb: MediumLevelILBasicBlock) -> bool:
     for il in bb:
         if use_const_outline:
             count += get_stack_string_len(f, il)
-        else:
-            if is_mov_imm_to_stack(il):
-                count += get_printable_len(il)
+        elif is_mov_imm_to_stack(il):
+            count += get_printable_len(il)
 
-    if count > MIN_STACKSTRING_LEN:
-        return True
-    return False
+    return count > MIN_STACKSTRING_LEN
 
 
 def extract_bb_stackstring(fh: FunctionHandle, bbh: BBHandle) -> Iterator[Tuple[Feature, Address]]:
@@ -173,8 +167,7 @@ def extract_bb_tight_loop(fh: FunctionHandle, bbh: BBHandle) -> Iterator[Tuple[F
 def extract_features(fh: FunctionHandle, bbh: BBHandle) -> Iterator[Tuple[Feature, Address]]:
     """extract basic block features"""
     for bb_handler in BASIC_BLOCK_HANDLERS:
-        for feature, addr in bb_handler(fh, bbh):
-            yield feature, addr
+        yield from bb_handler(fh, bbh)
     yield BasicBlock(), bbh.address
 
 

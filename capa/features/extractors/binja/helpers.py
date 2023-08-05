@@ -46,8 +46,7 @@ def unmangle_c_name(name: str) -> str:
     # TODO(xusheng): performance optimizations to improve test execution time
     # https://github.com/mandiant/capa/issues/1610
     if name[0] in ["@", "_"]:
-        match = re.match(r"^[@|_](.*?)(Stub)?(@\d+)?$", name)
-        if match:
-            return match.group(1)
+        if match := re.match(r"^[@|_](.*?)(Stub)?(@\d+)?$", name):
+            return match[1]
 
     return name

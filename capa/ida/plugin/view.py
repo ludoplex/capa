@@ -55,8 +55,9 @@ def parse_yaml_line(feature):
         # first, we need to grab the comment, if exists
         # next, we need to check for an embedded description
         feature, _, comment = feature.partition("#")
-        m = re.search(r"- count\(([a-zA-Z]+)\((.+)\s+=\s+(.+)\)\):\s*(.+)", feature)
-        if m:
+        if m := re.search(
+            r"- count\(([a-zA-Z]+)\((.+)\s+=\s+(.+)\)\):\s*(.+)", feature
+        ):
             # reconstruct count without description
             feature, value, description, count = m.groups()
             feature = f"- count({feature}({value})): {count}"
@@ -86,10 +87,9 @@ def parse_node_for_feature(feature, description, comment, depth):
                 display += f" # {comment}"
             display += f"\n{' '*(depth+2)}description: {description}\n"
         elif feature.startswith("- count"):
-            # count is weird, we need to format description based on feature type, so we parse with regex
-            # assume format - count(<feature_name>(<feature_value>)): <count>
-            m = re.search(r"- count\(([a-zA-Z]+)\((.+)\)\): (.+)", feature)
-            if m:
+            if m := re.search(
+                r"- count\(([a-zA-Z]+)\((.+)\)\): (.+)", feature
+            ):
                 name, value, count = m.groups()
                 if name in ("string",):
                     display += f"{' '*depth}{feature}"
@@ -491,7 +491,7 @@ class CapaExplorerRulegenEditor(QtWidgets.QTreeWidget):
         """ """
         rule_text = self.preview.toPlainText()
 
-        if -1 != rule_text.find("features:"):
+        if rule_text.find("features:") != -1:
             rule_text = rule_text[: rule_text.find("features:") + len("features:")]
             rule_text += "\n"
         else:
@@ -727,7 +727,7 @@ class CapaExplorerRulegenEditor(QtWidgets.QTreeWidget):
         self.reset_view()
 
         # check for lack of features block
-        if -1 == rule_text.find("features:"):
+        if rule_text.find("features:") == -1:
             return
 
         rule_features = rule_text[rule_text.find("features:") + len("features:") :].strip("\n")
@@ -751,17 +751,10 @@ class CapaExplorerRulegenEditor(QtWidgets.QTreeWidget):
             # shave the stack; divide by 2 because even indent, add 1 to avoid shaving root node
             stack[indent // 2 + 1 :] = []
 
-            # find our parent; should be last node in stack not None
-            parent = None
-            for o in stack[::-1]:
-                if o:
-                    parent = o
-                    break
-
-            node = self.make_child_node_from_feature(parent, parse_yaml_line(line.strip()))
-
-            # append our new node in case its a parent for another node
-            if node:
+            parent = next((o for o in stack[::-1] if o), None)
+            if node := self.make_child_node_from_feature(
+                parent, parse_yaml_line(line.strip())
+            ):
                 stack.append(node)
 
         if update_preview:
@@ -853,8 +846,7 @@ class CapaExplorerRulegenFeatures(QtWidgets.QTreeWidget):
 
     def slot_add_selected_features(self, action):
         """ """
-        selected = [item.data(0, 0x100) for item in self.selectedItems()]
-        if selected:
+        if selected := [item.data(0, 0x100) for item in self.selectedItems()]:
             self.editor.update_features(selected)
 
     def slot_add_n_bytes_feature(self, action):
@@ -903,8 +895,7 @@ class CapaExplorerRulegenFeatures(QtWidgets.QTreeWidget):
         """ """
         if text:
             for o in iterate_tree(self):
-                data = o.data(0, 0x100)
-                if data:
+                if data := o.data(0, 0x100):
                     to_match = data.get_value_str()
                     if not to_match or text.lower() not in to_match.lower():
                         if not o.isHidden():
@@ -1027,10 +1018,7 @@ class CapaExplorerRulegenFeatures(QtWidgets.QTreeWidget):
         self.parent_items = {}
 
         def format_address(e):
-            if isinstance(e, AbsoluteVirtualAddress):
-                return f"{hex(int(e))}"
-            else:
-                return ""
+            return f"{hex(int(e))}" if isinstance(e, AbsoluteVirtualAddress) else ""
 
         def format_feature(feature):
             """ """
@@ -1068,11 +1056,7 @@ class CapaExplorerRulegenFeatures(QtWidgets.QTreeWidget):
                         self.parent_items[feature], (format_feature(feature), format_address(addr)), feature=feature
                     )
             else:
-                if addrs:
-                    addr = addrs.pop()
-                else:
-                    # some features may not have an address e.g. "format"
-                    addr = _NoAddress()
+                addr = addrs.pop() if addrs else _NoAddress()
                 for i, v in enumerate((format_feature(feature), format_address(addr))):
                     self.parent_items[feature].setText(i, v)
                 self.parent_items[feature].setData(0, 0x100, feature)

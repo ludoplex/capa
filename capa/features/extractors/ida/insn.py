@@ -190,8 +190,7 @@ def extract_insn_string_features(
 
     ref = capa.features.extractors.ida.helpers.find_data_reference_from_insn(insn)
     if ref != insn.ea:
-        found = capa.features.extractors.ida.helpers.find_string_at(ref)
-        if found:
+        if found := capa.features.extractors.ida.helpers.find_string_at(ref):
             yield String(found), ih.address
 
 
@@ -318,12 +317,15 @@ def is_nzxor_stack_cookie_delta(f: idaapi.func_t, bb: idaapi.BasicBlock, insn: i
         return True
 
     # ... or within last bytes (instructions) before a return
-    if capa.features.extractors.ida.helpers.is_basic_block_return(bb) and insn.ea > (
-        bb.start_ea + capa.features.extractors.ida.helpers.basic_block_size(bb) - SECURITY_COOKIE_BYTES_DELTA
-    ):
-        return True
-
-    return False
+    return bool(
+        capa.features.extractors.ida.helpers.is_basic_block_return(bb)
+        and insn.ea
+        > (
+            bb.start_ea
+            + capa.features.extractors.ida.helpers.basic_block_size(bb)
+            - SECURITY_COOKIE_BYTES_DELTA
+        )
+    )
 
 
 def is_nzxor_stack_cookie(f: idaapi.func_t, bb: idaapi.BasicBlock, insn: idaapi.insn_t) -> bool:
@@ -335,12 +337,12 @@ def is_nzxor_stack_cookie(f: idaapi.func_t, bb: idaapi.BasicBlock, insn: idaapi.
     if is_nzxor_stack_cookie_delta(f, bb, insn):
         return True
     stack_cookie_regs = tuple(bb_stack_cookie_registers(bb))
-    if any(op_reg in stack_cookie_regs for op_reg in (insn.Op1.reg, insn.Op2.reg)):
-        # Example:
-        #   mov     eax, ___security_cookie
-        #   xor     eax, ebp
-        return True
-    return False
+    return any(
+        (
+            op_reg in stack_cookie_regs
+            for op_reg in (insn.Op1.reg, insn.Op2.reg)
+        )
+    )
 
 
 def extract_insn_nzxor_characteristic_features(
@@ -488,8 +490,7 @@ def extract_function_indirect_call_characteristic_features(
 def extract_features(f: FunctionHandle, bbh: BBHandle, insn: InsnHandle) -> Iterator[Tuple[Feature, Address]]:
     """extract instruction features"""
     for inst_handler in INSTRUCTION_HANDLERS:
-        for feature, ea in inst_handler(f, bbh, insn):
-            yield feature, ea
+        yield from inst_handler(f, bbh, insn)
 
 
 INSTRUCTION_HANDLERS = (

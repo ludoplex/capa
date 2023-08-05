@@ -100,21 +100,24 @@ class MitreExtractor:
 
     def _get_techniques_from_tactic(self, tactic: str) -> List[AttackPattern]:
         """Get techniques and sub techniques from a Mitre tactic (kill_chain_phases->phase_name)"""
-        techniques = self._remove_deprecated_objects(
+        return self._remove_deprecated_objects(
             self._memory_store.query(
                 [
                     Filter("type", "=", "attack-pattern"),
                     Filter("kill_chain_phases.phase_name", "=", tactic),
-                    Filter("kill_chain_phases.kill_chain_name", "=", self.kill_chain_name),
+                    Filter(
+                        "kill_chain_phases.kill_chain_name",
+                        "=",
+                        self.kill_chain_name,
+                    ),
                 ]
             )
         )
-        return techniques
 
     def _get_parent_technique_from_subtechnique(self, technique: AttackPattern) -> AttackPattern:
         """Get parent technique of a sub technique using the technique ID TXXXX.YYY"""
         sub_id = technique["external_references"][0]["external_id"].split(".")[0]
-        parent_technique = self._remove_deprecated_objects(
+        return self._remove_deprecated_objects(
             self._memory_store.query(
                 [
                     Filter("type", "=", "attack-pattern"),
@@ -122,7 +125,6 @@ class MitreExtractor:
                 ]
             )
         )[0]
-        return parent_technique
 
     def run(self) -> Dict[str, Dict[str, str]]:
         """Iterate over every technique over every tactic. If the technique is a sub technique, then
@@ -170,10 +172,10 @@ class MbcExtractor(MitreExtractor):
 
 def main(args: argparse.Namespace) -> None:
     data = {}
-    if args.extractor == "att&ck" or args.extractor == "both":
+    if args.extractor in ["att&ck", "both"]:
         logging.info("Extracting Mitre Att&ck techniques...")
         data["att&ck"] = AttckExtractor().run()
-    if args.extractor == "mbc" or args.extractor == "both":
+    if args.extractor in ["mbc", "both"]:
         logging.info("Extracting MBC behaviors...")
         data["mbc"] = MbcExtractor().run()
 

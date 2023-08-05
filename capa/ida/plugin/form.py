@@ -97,12 +97,13 @@ class QLineEditClicked(QtWidgets.QLineEdit):
     def mouseReleaseEvent(self, e):
         """ """
         old = self.text()
-        new = str(
+        if new := str(
             QtWidgets.QFileDialog.getExistingDirectory(
-                self.parent(), "Please select a capa rules directory", settings.user.get(CAPA_SETTINGS_RULE_PATH, "")
+                self.parent(),
+                "Please select a capa rules directory",
+                settings.user.get(CAPA_SETTINGS_RULE_PATH, ""),
             )
-        )
-        if new:
+        ):
             self.setText(new)
         else:
             self.setText(old)

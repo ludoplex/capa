@@ -22,10 +22,7 @@ tabulate.PRESERVE_WHITESPACE = True
 
 def width(s: str, character_count: int) -> str:
     """pad the given string to at least `character_count`"""
-    if len(s) < character_count:
-        return s + " " * (character_count - len(s))
-    else:
-        return s
+    return s + " " * (character_count - len(s)) if len(s) < character_count else s
 
 
 def render_meta(doc: rd.ResultDocument, ostream: StringIO):

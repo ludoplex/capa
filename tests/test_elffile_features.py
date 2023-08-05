@@ -30,7 +30,7 @@ def test_elffile_import_features():
     imports = list(extract_file_import_names(elf))
 
     # Verify that at least one import was found
-    assert len(imports) > 0, "No imports were found."
+    assert imports, "No imports were found."
 
     # Extract the symbol names from the extracted imports
     extracted_symbol_names = [imported[0].value for imported in imports]
@@ -61,7 +61,7 @@ def test_elffile_export_features():
     exports = list(extract_file_export_names(elf))
 
     # Verify that at least one export was found
-    assert len(exports) > 0, "No exports were found."
+    assert exports, "No exports were found."
 
     # Extract the symbol names from the extracted imports
     extracted_symbol_names = [exported[0].value for exported in exports]

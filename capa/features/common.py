@@ -50,12 +50,7 @@ def hex_string(h: str) -> str:
 def escape_string(s: str) -> str:
     """escape special characters"""
     s = repr(s)
-    if not s.startswith(('"', "'")):
-        # u'hello\r\nworld' -> hello\\r\\nworld
-        s = s[2:-1]
-    else:
-        # 'hello\r\nworld' -> hello\\r\\nworld
-        s = s[1:-1]
+    s = s[2:-1] if not s.startswith(('"', "'")) else s[1:-1]
     s = s.replace("\\'", "'")  # repr() may escape "'" in some edge cases, remove
     s = s.replace('"', '\\"')  # repr() does not escape '"', add
     return s
@@ -89,9 +84,7 @@ class Result:
         self.locations = locations if locations is not None else set()
 
     def __eq__(self, other):
-        if isinstance(other, bool):
-            return self.success == other
-        return False
+        return self.success == other if isinstance(other, bool) else False
 
     def __bool__(self):
         return self.success
@@ -155,20 +148,19 @@ class Feature(abc.ABC):  # noqa: B024
         return str(self.value)
 
     def __str__(self):
-        if self.value is not None:
-            if self.description:
-                return f"{self.get_name_str()}({self.get_value_str()} = {self.description})"
-            else:
-                return f"{self.get_name_str()}({self.get_value_str()})"
-        else:
+        if self.value is None:
             return f"{self.get_name_str()}"
+        if self.description:
+            return f"{self.get_name_str()}({self.get_value_str()} = {self.description})"
+        else:
+            return f"{self.get_name_str()}({self.get_value_str()})"
 
     def __repr__(self):
         return str(self)
 
     def evaluate(self, ctx: Dict["Feature", Set[Address]], **kwargs) -> Result:
         capa.perf.counters["evaluate.feature"] += 1
-        capa.perf.counters["evaluate.feature." + self.name] += 1
+        capa.perf.counters[f"evaluate.feature.{self.name}"] += 1
         return Result(self in ctx, self, [], locations=ctx.get(self, set()))
 
 
@@ -436,7 +428,7 @@ class OS(Feature):
 
     def evaluate(self, ctx, **kwargs):
         capa.perf.counters["evaluate.feature"] += 1
-        capa.perf.counters["evaluate.feature." + self.name] += 1
+        capa.perf.counters[f"evaluate.feature.{self.name}"] += 1
 
         for feature, locations in ctx.items():
             if not isinstance(feature, (OS,)):

@@ -123,8 +123,9 @@ def main(argv=None):
     for function in functions:
         logger.debug("matching function: 0x%04x", function)
         for analyzer in analyzers:
-            name = viv_utils.flirt.match_function_flirt_signatures(analyzer.matcher, vw, function)
-            if name:
+            if name := viv_utils.flirt.match_function_flirt_signatures(
+                analyzer.matcher, vw, function
+            ):
                 print(f"0x{function:04x}: {name}")
 
     return 0
